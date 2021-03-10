@@ -7,7 +7,12 @@ from decouple import config
 
 
 def main():
-    amqp_url = f'{config('AMQP_URL')}?connection_attempts=5&retry_delay=5'
+    AMQP_USER = config('AMQP_USER')
+    AMQP_PASS = config('AMQP_PASS')
+    AMQP_HOST = config('AMQP_HOST')
+    AMQP_PORT = config('AMQP_PORT')
+
+    amqp_url = f'amqps://{AMQP_USER}:{AMQP_PASS}@{AMQP_HOST}:{AMQP_PORT}?connection_attempts=5&retry_delay=5'
     connection = pika.BlockingConnection(
         pika.URLParameters(amqp_url))
 
