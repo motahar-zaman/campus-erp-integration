@@ -1,43 +1,114 @@
-from processors.mindedge import MindEdgeProcessor
+import os
+import django
+from django_scopes import scopes_disabled
+from models.course.course import Course as CourseModel
+from processors.mindedge import MindEdgeService
+from decouple import config
+
+DEBUG = True
+SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
+ROOT_URLCONF = __name__
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+urlpatterns = []
+PAYMENT_LIB_DIR = BASE_DIR
+
+INSTALLED_APPS = [
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'shared_models',
+]
+
+DATABASES = {
+    'default': {
+        'ENGINE': config('ENGINE', ''),
+        'NAME': config('DATABASE_NAME', ''),
+        'USER': config('DATABASE_USER', ''),
+        'PASSWORD': config('DATABASE_PASSWORD', ''),
+        'HOST': config('DATABASE_HOST', ''),
+        'PORT': config('DATABASE_PORT', ''),
+    }
+}
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
+django.setup()
+
+from shared_models.models import CertificateEnrollment, CertificateCourse, CourseEnrollment, Cart, LMSAccess
+
 
 configs = {
-    'demo': {
-        'processor_class': '',
-        'credentials': {
-            'test_url': '',
-            'production_url': '',
-            'username': '',
-            'password': '',
-            'token': '',
-        }
-    },
-
     'mindedge': {
-        'processor_class': MindEdgeProcessor,
+        'processor_class': MindEdgeService,
         'credentials': {
-            'test_url': 'https://api.mindedgeuniversity.com/v1/studentService',
-            'production_url': 'https://api.mindedgeuniversity.com/v1/studentService',
-            'username': '',
-            'password': '',
-            'token': '',
-            'url': 'https://api.mindedgeuniversity.com/v1/studentService',
+            'username': 'jenzabar',
+            'password': 'jz_me_api',
+            'token': '09d66f6e5482d9b0ba91815c350fd9af3770819b',
+            'url': 'https://api.mindedgeuniversity.com/v1/studentService'
         }
     }
 }
 
 
 def execute(message_data):
-    # message_data = {'data': serializer.data, 'metadata': {'action': 'create_student', 'erp': 'mindedge', 'user': user}}
+    # message_data = {
+    #     'data': {
+    #         'cid': course_model.external_id
+    #     },
+    #     'erp': 'mindedge',
+    #     'profile': profile,
+    #     'action': 'enroll',
+    #     'enrollment_type': 'course',
+    #     'enrollment_id': str(course_enrollment.id),
+    #     'cart_id': str(cart.id)
+    # }
+
+    erp = message_data['erp']
+    profile = message_data['profile']
     data = message_data['data']
+    action = message_data['action']
 
-    metadata = message_data['metadata']
-    erp = metadata['erp']
-    user = metadata['user']
+    erp_config = configs[erp]
+    processor_class = erp_config['processor_class']
+    credentials = erp_config['credentials']
 
-    config = configs[erp]
-    processor_class = config['processor_class']
-    credentials = config['credentials']
+    processor_obj = processor_class(credentials, profile, data)
 
-    processor_obj = processor_class(credentials, user, data)
-    action = getattr(processor_obj, metadata['action'])
-    action()
+    if processor_obj.authenticate():
+        action = getattr(processor_obj, action)
+        resp = action()
+
+        if message_data['enrollment_type'] == 'course':
+            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+
+            LMSAccess.objects.update_or_create(
+                course_enrollment=enrollment,
+                defaults={
+                    'student_ref': 'student',
+                    'lms_access_details': resp,
+                }
+            )
+        else:
+            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+
+        enrollment.enrollment_status = 'enrolled'
+        enrollment.save()
+
+        cart = Cart.objects.get(id=message_data['cart_id'])
+
+        cart.cart_status = 'processed'
+
+        cart.save()
+
+
+    else:
+        resp = {'status': 'fail', 'error': 'Auth failed'}
+
+    print('***************')
+    print(resp)
+
+    print('enrollment: ', enrollment.id)
+    print('enrollment status: ', enrollment.enrollment_status)
+
+    print('cart: ', cart.id)
+    print('cart status: ', cart.cart_status)
+    print('***************')

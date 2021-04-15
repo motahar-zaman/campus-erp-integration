@@ -18,7 +18,7 @@ def main():
 
     channel = connection.channel()
 
-    channel.queue_declare(queue='students')
+    channel.queue_declare(queue='enrollments')
 
     def callback(ch, method, properties, body):
         print(' [x] Received task. Trying to execute...')
@@ -27,7 +27,7 @@ def main():
         print(' [x] Done')
 
     channel.basic_consume(
-        queue='students', on_message_callback=callback, auto_ack=True)
+        queue='enrollments', on_message_callback=callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
