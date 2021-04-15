@@ -4,9 +4,11 @@ import sys
 import os
 from executor import execute
 from decouple import config
+from status_history import save_status_history
 
 
 def main():
+    status_history_data = {}
     AMQP_USER = config('AMQP_USER')
     AMQP_PASS = config('AMQP_PASS')
     AMQP_HOST = config('AMQP_HOST')
@@ -21,10 +23,10 @@ def main():
     channel.queue_declare(queue='enrollments')
 
     def callback(ch, method, properties, body):
-        print(' [x] Received task. Trying to execute...')
         data = json.loads(body.decode())
+        status_data = {'comment': 'received', 'data': data}
         execute(data)
-        print(' [x] Done')
+        save_status_history(status_data)
 
     channel.basic_consume(
         queue='enrollments', on_message_callback=callback, auto_ack=True)

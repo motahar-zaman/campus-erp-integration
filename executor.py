@@ -4,6 +4,7 @@ from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 from processors.mindedge import MindEdgeService
 from decouple import config
+from status_history import save_status_history
 
 DEBUG = True
 SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
@@ -21,7 +22,7 @@ INSTALLED_APPS = [
 
 DATABASES = {
     'default': {
-        'ENGINE': config('ENGINE', ''),
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': config('DATABASE_NAME', ''),
         'USER': config('DATABASE_USER', ''),
         'PASSWORD': config('DATABASE_PASSWORD', ''),
@@ -74,11 +75,19 @@ def execute(message_data):
     processor_obj = processor_class(credentials, profile, data)
 
     if processor_obj.authenticate():
+        status_data = {'comment': 'erp_authenticated', 'data': credentials}
+        save_status_history(status_data)
         action = getattr(processor_obj, action)
         resp = action()
 
+        status_data = {'comment': 'enrolled', 'data': resp}
+        save_status_history(status_data)
+
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+
+            status_data = {'comment': 'lms_created'}
+            save_status_history(status_data)
 
             LMSAccess.objects.update_or_create(
                 course_enrollment=enrollment,
@@ -101,14 +110,6 @@ def execute(message_data):
 
 
     else:
+        status_data = {'comment': 'authentication_failed', 'data': credentials}
+        save_status_history(status_data)
         resp = {'status': 'fail', 'error': 'Auth failed'}
-
-    print('***************')
-    print(resp)
-
-    print('enrollment: ', enrollment.id)
-    print('enrollment status: ', enrollment.enrollment_status)
-
-    print('cart: ', cart.id)
-    print('cart status: ', cart.cart_status)
-    print('***************')
