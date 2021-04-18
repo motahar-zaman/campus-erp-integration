@@ -1,4 +1,5 @@
 from mongoengine import connect, disconnect, get_db
+from decouple import config
 
 def save_status_history(status_data=None):
     username = config('MONGO_USERNAME', 'cc-dev-admin-api')

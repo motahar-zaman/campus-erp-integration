@@ -23,11 +23,10 @@ def main():
     channel.queue_declare(queue='enrollments')
 
     def callback(ch, method, properties, body):
-        print('task received')
-        # data = json.loads(body.decode())
-        # status_data = {'comment': 'received', 'data': data}
-        # execute(data)
-        # save_status_history(status_data)
+        data = json.loads(body.decode())
+        status_data = {'comment': 'received', 'data': data}
+        execute(data)
+        save_status_history(status_data)
 
     channel.basic_consume(
         queue='enrollments', on_message_callback=callback, auto_ack=True)
