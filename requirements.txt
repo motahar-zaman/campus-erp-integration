@@ -84,6 +84,6 @@ wcwidth==0.2.5
 webencodings==0.5.1
 wrapt==1.11.2
 xmltodict==0.12.0
-../campus-libs
+../marketplace-shared-lib
 ../campuscom-shared-models
 ../marketplace-shared-models

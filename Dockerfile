@@ -1,6 +1,5 @@
-FROM python:3.9-alpine
+FROM python:3.7
 WORKDIR /opt/app
-RUN apk add --no-cache gcc musl-dev linux-headers
 
 RUN python -m venv /opt/venv
 # Make sure we use the virtualenv:
@@ -18,7 +17,7 @@ RUN ssh-keyscan ${SSH_KNOWN_HOST} >> /root/.ssh/known_hosts
 
 ARG REPO_URL_CC_LIBS
 ARG VERSION_CC_LIBS
-RUN git clone --branch ${VERSION_CC_LIBS} ${REPO_URL_CC_LIBS} /opt/campus-libs/
+RUN git clone --branch ${VERSION_CC_LIBS} ${REPO_URL_CC_LIBS} /opt/marketplace-shared-lib/
 
 ARG REPO_URL_CC_MODELS_PG
 ARG VERSION_CC_MODELS_PG
