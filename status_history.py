@@ -2,15 +2,16 @@ from mongoengine import connect, disconnect, get_db
 from decouple import config
 
 def save_status_history(status_data=None):
-    username = config('MONGO_USERNAME', 'cc-dev-admin-api')
-    password = config('MONGO_PASSWORD', 'FWPCIvc7McXRhg')
-    auth_source = config('MONGO_AUTH_SOURCE', 'admin')
-    host = config('MONGO_HOST', 'ec2-18-188-170-233.us-east-2.compute.amazonaws.com')
-    port = config('MONGO_PORT', '27017')
-    db_name = config('MONGO_DB_NAME', 'campus')
+    mongodb_host = config('MONGODB_HOST')
+    mongodb_database = config('MONGODB_DATABASE')
+    mongodb_port = config('MONGODB_PORT')
+    mongodb_username = config('MONGODB_USERNAME')
+    mongodb_password = config('MONGODB_PASSWORD')
+    mongodb_auth_database = config('MONGODB_AUTH_DATABASE')
 
     disconnect()
-    connect(db_name, host=host, port=int(port), username=username, password=password, authentication_source=auth_source)
+    connect(mongodb_database, host=mongodb_host, port=int(mongodb_port), username=mongodb_username, password=mongodb_password, authentication_source=mongodb_auth_database)
+
     db = get_db()
     coll = db.get_collection('EnrollmentStatusHistory')
     coll.insert_one(status_data)
