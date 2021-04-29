@@ -24,7 +24,6 @@ class MindEdgeService():
         response = requests.post(self.url, json=payload)
         resp = response.json()
 
-
         if resp['status'] == 'success':
             self.auth_header = {'Authorization': resp['access_token']}
             return True
@@ -48,7 +47,14 @@ class MindEdgeService():
 
         response = requests.post(self.url, json=payload, headers=self.auth_header)
 
-        return response.json()
+        resp = response.json()
+
+        if resp['status'] == 'fail':
+            if resp['error'].lower() == 'Student already enrolled in course'.lower():
+                resp = self.get_tokenized_url()
+                resp['already_enrolled'] = True
+
+        return resp
 
     def find(self):
         '''
@@ -69,6 +75,24 @@ class MindEdgeService():
             'email': self.profile['primary_email'],
             'cid': self.data['cid']
         }
+
+        response = requests.post(self.url, json=payload, headers=self.auth_header)
+
+        return response.json()
+
+    def get_tokenized_url(self):
+        payload = {
+            'action': 'getAccountlessSSO',
+            'email': self.profile['primary_email'],
+            'first_name': self.profile['first_name'],
+            'last_name': self.profile['last_name'],
+            'login_link': True
+        }
+
+        if 'cid' in self.data.keys():
+            payload['cid'] = self.data['cid']
+        else:
+            payload['sid'] = self.data['sid']
 
         response = requests.post(self.url, json=payload, headers=self.auth_header)
 

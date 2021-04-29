@@ -1,7 +1,5 @@
 import os
 import django
-from django_scopes import scopes_disabled
-from models.course.course import Course as CourseModel
 from processors.mindedge import MindEdgeService
 from decouple import config
 from status_history import save_status_history
@@ -34,8 +32,7 @@ DATABASES = {
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
 django.setup()
 
-from shared_models.models import CertificateEnrollment, CertificateCourse, CourseEnrollment, Cart, LMSAccess
-
+from shared_models.models import CertificateEnrollment, CourseEnrollment, Cart, LMSAccess
 
 configs = {
     'mindedge': {
@@ -107,7 +104,6 @@ def execute(message_data):
         cart.cart_status = 'processed'
 
         cart.save()
-
 
     else:
         status_data = {'comment': 'authentication_failed', 'data': credentials}
