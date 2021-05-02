@@ -4,6 +4,7 @@ from processors.mindedge import MindEdgeService
 from decouple import config
 from status_history import save_status_history
 
+# Django stuff begins
 DEBUG = True
 SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
 ROOT_URLCONF = __name__
@@ -33,15 +34,16 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
 django.setup()
 
 from shared_models.models import CertificateEnrollment, CourseEnrollment, Cart, LMSAccess
+# Django stuff ends
 
 configs = {
     'mindedge': {
         'processor_class': MindEdgeService,
         'credentials': {
-            'username': 'jenzabar',
-            'password': 'jz_me_api',
-            'token': '09d66f6e5482d9b0ba91815c350fd9af3770819b',
-            'url': 'https://api.mindedgeuniversity.com/v1/studentService'
+            'username': config('MINDEDGE_USERNAME', 'jenzabar'),
+            'password': config('MINDEDGE_PASSWORD', 'jz_me_api'),
+            'token': config('MINDEDGE_TOKEN', '09d66f6e5482d9b0ba91815c350fd9af3770819b'),
+            'url': config('MINDEDGE_URL', 'https://api.mindedgeuniversity.com/v1/studentService'),
         }
     }
 }
