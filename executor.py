@@ -95,7 +95,7 @@ def execute(message_data):
                 # lms says this course was already enrolled to.
                 # so there must be another entry in the CourseEnrollment table with the same course for the same profile.
                 try:
-                    old_enrollment = CourseEnrollment.objects.exclude(id=enrollment.id).get(profile=enrollment.profile, course=profile.course, section=profile.section)
+                    old_enrollment = CourseEnrollment.objects.exclude(id=enrollment.id).get(profile=enrollment.profile, course=enrollment.course, section=enrollment.section)
                 except CourseEnrollment.DoesNotExist:
                     # not found. therefore proceed with the current enrollment obj
                     pass
