@@ -8,7 +8,6 @@ from status_history import save_status_history
 
 
 def main():
-    status_history_data = {}
     AMQP_USER = config('AMQP_USER')
     AMQP_PASS = config('AMQP_PASS')
     AMQP_HOST = config('AMQP_HOST')
@@ -25,8 +24,8 @@ def main():
     def callback(ch, method, properties, body):
         data = json.loads(body.decode())
         status_data = {'comment': 'received', 'data': data}
-        execute(data)
         save_status_history(status_data)
+        execute(data)
 
     channel.basic_consume(
         queue='enrollments', on_message_callback=callback, auto_ack=True)
