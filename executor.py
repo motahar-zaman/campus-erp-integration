@@ -85,6 +85,25 @@ def execute(message_data):
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
 
+            already_enrolled = False
+            try:
+                already_enrolled = resp['already_enrolled']
+            except KeyError:
+                pass
+
+            if already_enrolled:
+                # lms says this course was already enrolled to.
+                # so there must be another entry in the CourseEnrollment table with the same course for the same profile.
+                try:
+                    old_enrollment = CourseEnrollment.objects.exclude(id=enrollment.id).get(profile=enrollment.profile, course=enrollment.course, section=enrollment.section)
+                except CourseEnrollment.DoesNotExist:
+                    # not found. therefore proceed with the current enrollment obj
+                    pass
+                else:
+                    # found. so lets delete current enrollment object. and use the found one instead.
+                    enrollment.delete()
+                    enrollment = old_enrollment
+
             status_data = {'comment': 'lms_created'}
             save_status_history(status_data)
 
