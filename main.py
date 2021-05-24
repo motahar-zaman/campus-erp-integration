@@ -11,7 +11,7 @@ def main():
     AMQP_HOST = config('AMQP_HOST')
     AMQP_PORT = config('AMQP_PORT')
 
-    amqp_url = f'amqp://{AMQP_USER}:{AMQP_PASS}@{AMQP_HOST}:{AMQP_PORT}?connection_attempts=5&retry_delay=5'
+    amqp_url = f'amqps://{AMQP_USER}:{AMQP_PASS}@{AMQP_HOST}:{AMQP_PORT}?connection_attempts=5&retry_delay=5'
     connection = pika.BlockingConnection(
         pika.URLParameters(amqp_url))
 
