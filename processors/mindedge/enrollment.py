@@ -1,8 +1,8 @@
 import os
 import django
-from processors.mindedge import MindEdgeService
+from .service import MindEdgeService
 from decouple import config
-from status_history import save_status_history
+from status_logger import save_status_to_mongo
 
 # Django stuff begins
 DEBUG = True
@@ -49,25 +49,21 @@ configs = {
 }
 
 
-def execute(message_data):
-    # message_data = {
-    #     'data': {
-    #         'cid': course_model.external_id
-    #     },
-    #     'erp': 'mindedge',
-    #     'profile': profile,
-    #     'action': 'enroll',
-    #     'enrollment_type': 'course',
-    #     'enrollment_id': str(course_enrollment.id),
-    #     'cart_id': str(cart.id)
-    # }
+def enroll(message_data):
+    try:
+        erp = message_data['erp']
+        profile = message_data['profile']
+        data = message_data['data']
+        action = message_data['action']
+    except KeyError:
+        save_status_to_mongo({'comment': 'unknown data format'})
+        return
 
-    erp = message_data['erp']
-    profile = message_data['profile']
-    data = message_data['data']
-    action = message_data['action']
-
-    erp_config = configs[erp]
+    try:
+        erp_config = configs[erp]
+    except KeyError:
+        save_status_to_mongo({'comment': erp + ' not implemented'})
+        return
     processor_class = erp_config['processor_class']
     credentials = erp_config['credentials']
 
@@ -75,12 +71,12 @@ def execute(message_data):
 
     if processor_obj.authenticate():
         status_data = {'comment': 'erp_authenticated', 'data': credentials}
-        save_status_history(status_data)
+        save_status_to_mongo(status_data)
         action = getattr(processor_obj, action)
         resp = action()
 
         status_data = {'comment': 'enrolled', 'data': resp}
-        save_status_history(status_data)
+        save_status_to_mongo(status_data)
 
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
@@ -105,7 +101,7 @@ def execute(message_data):
                     enrollment = old_enrollment
 
             status_data = {'comment': 'lms_created'}
-            save_status_history(status_data)
+            save_status_to_mongo(status_data)
 
             LMSAccess.objects.update_or_create(
                 course_enrollment=enrollment,
@@ -128,5 +124,5 @@ def execute(message_data):
 
     else:
         status_data = {'comment': 'authentication_failed', 'data': credentials}
-        save_status_history(status_data)
+        save_status_to_mongo(status_data)
         resp = {'status': 'fail', 'error': 'Auth failed'}

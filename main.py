@@ -1,10 +1,8 @@
-import json
 import pika
 import sys
 import os
-from executor import execute
 from decouple import config
-from status_history import save_status_history
+from processors import mindedge_callback, hubspot_callback
 
 
 def main():
@@ -20,15 +18,13 @@ def main():
     channel = connection.channel()
 
     channel.queue_declare(queue='enrollments')
-
-    def callback(ch, method, properties, body):
-        data = json.loads(body.decode())
-        status_data = {'comment': 'received', 'data': data}
-        save_status_history(status_data)
-        execute(data)
+    channel.queue_declare(queue='hubspot')
 
     channel.basic_consume(
-        queue='enrollments', on_message_callback=callback, auto_ack=True)
+        queue='enrollments', on_message_callback=mindedge_callback, auto_ack=True)
+
+    channel.basic_consume(
+        queue='hubspot', on_message_callback=hubspot_callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
