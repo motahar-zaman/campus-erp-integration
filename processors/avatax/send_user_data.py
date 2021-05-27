@@ -41,6 +41,7 @@ def commit_transaction(data):
                 'description': data['product']['id']
             }
         ],
+        'code': data['cart_id'],
         'commit': True
     }
 
