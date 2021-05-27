@@ -2,7 +2,7 @@ import pika
 import sys
 import os
 from decouple import config
-from processors import mindedge_callback, hubspot_callback
+from processors import mindedge_callback, hubspot_callback, avatax_callback
 
 
 def main():
@@ -19,12 +19,16 @@ def main():
 
     channel.queue_declare(queue='enrollments')
     channel.queue_declare(queue='hubspot')
+    channel.queue_declare(queue='avatax')
 
     channel.basic_consume(
         queue='enrollments', on_message_callback=mindedge_callback, auto_ack=True)
 
     channel.basic_consume(
         queue='hubspot', on_message_callback=hubspot_callback, auto_ack=True)
+
+    channel.basic_consume(
+        queue='avatax', on_message_callback=avatax_callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
