@@ -32,7 +32,7 @@ def commit_transaction(data):
         'type': 'SalesInvoice',
         'companyCode': company_code,
         'date': timezone.now().strftime("%Y-%m-%d"),
-        'customerCode': data['profile']['id'],
+        'customerCode': data['primary_email'],
         'lines': [
             {
                 'number': 1,
