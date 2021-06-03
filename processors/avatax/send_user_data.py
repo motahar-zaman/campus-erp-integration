@@ -32,24 +32,20 @@ def commit_transaction(data):
         'type': 'SalesInvoice',
         'companyCode': company_code,
         'date': timezone.now().strftime("%Y-%m-%d"),
-        'customerCode': data['profile']['id'],
+        'customerCode': data['primary_email'],
         'lines': [
             {
                 'number': 1,
                 'amount': data['price'],
                 'taxCode': tax_code,
-                'description': data['product']['id']
+                'description': data['description']
             }
         ],
         'code': data['cart_id'],
         'commit': True
     }
 
-    print('-------------payload--------------')
-    print(payload)
-    print('----------------------------------')
 
     resp = requests.post(url, json=payload, headers=auth_header)
-    print(resp.json())
 
     return resp.status_code

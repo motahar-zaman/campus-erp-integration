@@ -18,7 +18,5 @@ def hubspot_callback(ch, method, properties, body):
 
 
 def avatax_callback(ch, method, properties, body):
-    print('received task for avatax: ')
     data = json.loads(body.decode())
-    print(data)
     commit_transaction(data)
