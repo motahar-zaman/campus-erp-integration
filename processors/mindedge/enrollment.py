@@ -116,12 +116,6 @@ def enroll(message_data):
         enrollment.enrollment_status = 'enrolled'
         enrollment.save()
 
-        cart = Cart.objects.get(id=message_data['cart_id'])
-
-        cart.cart_status = 'processed'
-
-        cart.save()
-
     else:
         status_data = {'comment': 'authentication_failed', 'data': credentials}
         save_status_to_mongo(status_data)
