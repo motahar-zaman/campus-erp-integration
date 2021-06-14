@@ -1,7 +1,7 @@
 import json
 from status_logger import save_status_to_mongo
 from .mindedge.enrollment import enroll
-from .hubspot.data_service import send_user_data
+from .hubspot.data_service import send_user_data, send_product_data
 from .avatax.send_user_data import commit_transaction
 
 
@@ -15,6 +15,11 @@ def mindedge_callback(ch, method, properties, body):
 def hubspot_callback(ch, method, properties, body):
     data = json.loads(body.decode())
     send_user_data(data)
+
+
+def product_callback(ch, method, properties, body):
+    data = json.loads(body.decode())
+    send_product_data(data)
 
 
 def avatax_callback(ch, method, properties, body):
