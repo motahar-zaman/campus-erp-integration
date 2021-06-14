@@ -64,8 +64,10 @@ def send_product_data(data):
 
     url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_CREATION_FORM_ID}'
 
-    if data['cart_status'].lower() == 'processed':
-        url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_UPDATE_FORM_ID}'
+    for field in data['fields']:
+        if field['name'] == 'cart_status' and field['value'].lower() == 'processed':
+            url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_UPDATE_FORM_ID}'
+            break
 
     resp = requests.post(url, json=data)
 
