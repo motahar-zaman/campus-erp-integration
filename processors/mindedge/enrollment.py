@@ -69,54 +69,77 @@ def enroll(message_data):
 
     processor_obj = processor_class(credentials, profile, data)
 
-    if processor_obj.authenticate():
-        status_data = {'comment': 'erp_authenticated', 'data': credentials}
-        save_status_to_mongo(status_data)
-        action = getattr(processor_obj, action)
-        resp = action()
+    if not processor_obj.authenticate():
+        if message_data['enrollment_type'] == 'course':
+            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CourseEnrollment.STATUS_FAILED
 
-        status_data = {'comment': 'enrolled', 'data': resp}
+        else:
+            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CertificateEnrollment.STATUS_FAILED
+
+        enrollment.save()
+        status_data = {'comment': 'authentication_failed', 'data': credentials}
+        save_status_to_mongo(status_data)
+        return 0
+
+    status_data = {'comment': 'erp_authenticated', 'data': credentials}
+    save_status_to_mongo(status_data)
+    action = getattr(processor_obj, action)
+    resp = action()
+
+    if resp['status'] == 'fail' and not resp['already_enrolled']:
+        status_data = {'comment': 'failed', 'data': resp}
         save_status_to_mongo(status_data)
 
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CourseEnrollment.STATUS_FAILED
 
-            already_enrolled = False
-            try:
-                already_enrolled = resp['already_enrolled']
-            except KeyError:
-                pass
-
-            if already_enrolled:
-                # lms says this course was already enrolled to.
-                # so there must be another entry in the CourseEnrollment table with the same course for the same profile.
-                try:
-                    old_enrollment = CourseEnrollment.objects.exclude(id=enrollment.id).get(profile=enrollment.profile, course=enrollment.course, section=enrollment.section)
-                except CourseEnrollment.DoesNotExist:
-                    # not found. therefore proceed with the current enrollment obj
-                    pass
-                else:
-                    # found. so lets delete current enrollment object. and use the found one instead.
-                    enrollment.delete()
-                    enrollment = old_enrollment
-
-            status_data = {'comment': 'lms_created'}
-            save_status_to_mongo(status_data)
-
-            LMSAccess.objects.update_or_create(
-                course_enrollment=enrollment,
-                defaults={
-                    'student_ref': 'student',
-                    'lms_access_details': resp,
-                }
-            )
         else:
             enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CertificateEnrollment.STATUS_FAILED
+        return 0
 
-        enrollment.enrollment_status = 'enrolled'
-        enrollment.save()
+    status_data = {'comment': 'enrolled', 'data': resp}
+    save_status_to_mongo(status_data)
 
-    else:
-        status_data = {'comment': 'authentication_failed', 'data': credentials}
+    if message_data['enrollment_type'] == 'course':
+        enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+
+        already_enrolled = False
+        try:
+            already_enrolled = resp['already_enrolled']
+        except KeyError:
+            pass
+
+        if already_enrolled:
+            # lms says this course was already enrolled to.
+            # so there must be another entry in the CourseEnrollment table with the same course for the same profile.
+            try:
+                old_enrollment = CourseEnrollment.objects.exclude(id=enrollment.id).get(profile=enrollment.profile, course=enrollment.course, section=enrollment.section)
+            except CourseEnrollment.DoesNotExist:
+                # not found. therefore proceed with the current enrollment obj
+                pass
+            else:
+                # found. so lets delete current enrollment object. and use the found one instead.
+                enrollment.delete()
+                enrollment = old_enrollment
+
+        enrollment.status = CourseEnrollment.STATUS_SUCCESS
+
+        status_data = {'comment': 'lms_created'}
         save_status_to_mongo(status_data)
-        resp = {'status': 'fail', 'error': 'Auth failed'}
+
+        LMSAccess.objects.update_or_create(
+            course_enrollment=enrollment,
+            defaults={
+                'student_ref': 'student',
+                'lms_access_details': resp,
+            }
+        )
+    else:
+        enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+        enrollment.status = CertificateEnrollment.STATUS_SUCCESS
+
+    enrollment.save()
