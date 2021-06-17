@@ -50,6 +50,14 @@ configs = {
 
 
 def enroll(message_data):
+    if message_data['enrollment_type'] == 'course':
+        enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+        enrollment.status = CourseEnrollment.STATUS_PENDING
+
+    else:
+        enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+        enrollment.status = CertificateEnrollment.STATUS_PENDING
+
     try:
         erp = message_data['erp']
         profile = message_data['profile']
@@ -57,13 +65,14 @@ def enroll(message_data):
         action = message_data['action']
     except KeyError:
         save_status_to_mongo({'comment': 'unknown data format'})
-        return
+        return 1
 
     try:
         erp_config = configs[erp]
     except KeyError:
         save_status_to_mongo({'comment': erp + ' not implemented'})
-        return
+        return 1
+
     processor_class = erp_config['processor_class']
     credentials = erp_config['credentials']
 
