@@ -4,6 +4,8 @@ from .mindedge.enrollment import enroll
 from .hubspot.data_service import send_user_data, send_product_data
 from .avatax.send_user_data import commit_transaction
 
+from .elastic_search.data_logger import upload_log
+
 
 def mindedge_callback(ch, method, properties, body):
     data = json.loads(body.decode())
@@ -25,3 +27,8 @@ def product_callback(ch, method, properties, body):
 def avatax_callback(ch, method, properties, body):
     data = json.loads(body.decode())
     commit_transaction(data)
+
+
+def requestlog_callback(ch, method, properties, body):
+    data = json.loads(body.decode())
+    upload_log(data)
