@@ -2,7 +2,7 @@ import pika
 import sys
 import os
 from decouple import config
-from processors import mindedge_callback, hubspot_callback, product_callback, avatax_callback
+from processors import mindedge_callback, hubspot_callback, product_callback, avatax_callback, requestlog_callback
 
 
 def main():
@@ -33,6 +33,9 @@ def main():
 
     channel.basic_consume(
         queue='avatax', on_message_callback=avatax_callback, auto_ack=True)
+
+    channel.basic_consume(
+        queue='requestlog', on_message_callback=requestlog_callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
