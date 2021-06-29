@@ -60,7 +60,6 @@ def send_user_data(data):
 def send_product_data(data):
     HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
     HUBSPOT_CART_CREATION_FORM_ID = config('HUBSPOT_CART_CREATION_FORM_ID')
-    HUBSPOT_CART_UPDATE_FORM_ID = config('HUBSPOT_CART_UPDATE_FORM_ID')
 
     url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_CREATION_FORM_ID}'
 
