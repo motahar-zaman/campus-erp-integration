@@ -21,6 +21,9 @@ def main():
     channel.queue_declare(queue='hubspot')
     channel.queue_declare(queue='product')
     channel.queue_declare(queue='avatax')
+    channel.queue_declare(queue='cancel_enrollment')
+    channel.queue_declare(queue='cancel_crm')
+    channel.queue_declare(queue='cancel_tax')
 
     channel.basic_consume(
         queue='enrollments', on_message_callback=mindedge_callback, auto_ack=True)
