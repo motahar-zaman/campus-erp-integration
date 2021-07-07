@@ -36,3 +36,18 @@ def avatax_callback(ch, method, properties, body):
 def requestlog_callback(ch, method, properties, body):
     data = json.loads(body.decode())
     upload_log(data)
+
+
+def send_enrollment_cancel_email_callback(ch, method, properties, body):
+    data = json.loads(body.decode())
+    send_enrollment_cancel_email(data)
+
+
+def send_cart_data_callback(ch, method, properties, body):
+    data = json.loads(body.decode())
+    send_cart_data(data)
+
+
+def send_tax_refund_data_callback(ch, method, properties, body):
+    data = json.loads(body.decode())
+    send_tax_refund_data(data)
