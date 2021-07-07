@@ -2,7 +2,7 @@ import requests
 from decouple import config
 
 
-def send_product_data(data):
+def send_cart_data(data):
     HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
     HUBSPOT_CART_CREATION_FORM_ID = config('HUBSPOT_CART_CREATION_FORM_ID')
 
@@ -10,4 +10,4 @@ def send_product_data(data):
 
     resp = requests.post(url, json=data)
 
-    return resp.status_code
+    return resp

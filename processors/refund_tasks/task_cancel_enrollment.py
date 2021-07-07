@@ -65,4 +65,4 @@ def send_enrollment_cancel_email(data):
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
 
     refund.save()
-    return HttpResponse(status=HTTP_200_OK)
+    return refund

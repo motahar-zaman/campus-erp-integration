@@ -47,7 +47,7 @@ EMAIL_RECIPIENT_LIST = ['mamun@sgcsoft.net', 'sahidul@sgcsoft.net']
 # Django stuff ends
 
 
-def send_tax_refund_request(data):
+def send_tax_refund_data(data):
     refund = PaymentRefund.objects.get(id=data['refund_id'])
 
     accountid = config('AVATAX_ACCOUNT_ID')
@@ -96,4 +96,4 @@ def send_tax_refund_request(data):
     if resp.status_code == 200:
         refund.task_tax_refund = PaymentRefund.TASK_STATUS_DONE
 
-    refund.save()
+    return resp
