@@ -62,9 +62,9 @@ def send_enrollment_cancel_email(data):
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except:
-        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
-    else:
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
+    else:
+        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
 
     refund.save()
     return refund
