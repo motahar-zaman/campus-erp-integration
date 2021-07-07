@@ -2,6 +2,7 @@ from decouple import config
 import os
 import django
 from django.core.mail import send_mail
+from django_scopes import scopes_disabled
 
 
 # Django stuff begins
@@ -46,7 +47,8 @@ from shared_models.models import PaymentRefund
 
 
 def send_enrollment_cancel_email(data):
-    refund = PaymentRefund.objects.get(id=data['refund_id'])
+    with scopes_disabled():
+        refund = PaymentRefund.objects.get(id=data['refund_id'])
     student_name = data['student_name']
     student_email = data['student_email']
     certificate = data['certificate']
