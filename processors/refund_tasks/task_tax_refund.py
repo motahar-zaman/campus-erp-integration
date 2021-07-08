@@ -3,7 +3,7 @@ import os
 import django
 import requests
 import base64
-from django.utils import timezone
+from django_scopes import scopes_disabled
 
 
 # Django stuff begins
@@ -48,7 +48,8 @@ EMAIL_RECIPIENT_LIST = ['mamun@sgcsoft.net', 'sahidul@sgcsoft.net']
 
 
 def send_tax_refund_data(data):
-    refund = PaymentRefund.objects.get(id=data['refund_id'])
+    with scopes_disabled():
+        refund = PaymentRefund.objects.get(id=data['refund_id'])
 
     accountid = config('AVATAX_ACCOUNT_ID')
     license_key = config('AVATAX_LICENSE_KEY')
