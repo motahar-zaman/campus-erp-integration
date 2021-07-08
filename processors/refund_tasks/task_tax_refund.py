@@ -47,7 +47,15 @@ from shared_models.models import PaymentRefund
 # Django stuff ends
 
 
+def save_task_data(msg, data):
+    from mongoengine import get_db
+    db = get_db()
+    coll = db.get_collection('refundtasks')
+    coll.insert_one({'message': msg, 'data': data})
+
+
 def send_tax_refund_data(data):
+    save_task_data('tax refund task received', data)
     with scopes_disabled():
         try:
             refund = PaymentRefund.objects.get(id=data['refund_id'])
@@ -76,6 +84,5 @@ def send_tax_refund_data(data):
     if resp.status_code == 200:
         refund.task_tax_refund = PaymentRefund.TASK_STATUS_DONE
 
-    print(resp.json())
-
+    save_task_data('tax refund task completed', resp.json())
     return resp

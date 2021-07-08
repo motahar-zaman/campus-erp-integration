@@ -46,7 +46,15 @@ from shared_models.models import PaymentRefund
 # Django stuff ends
 
 
+def save_task_data(msg, data):
+    from mongoengine import get_db
+    db = get_db()
+    coll = db.get_collection('refundtasks')
+    coll.insert_one({'message': msg, 'data': data})
+
+
 def send_enrollment_cancel_email(data):
+    save_task_data('enrollment cancel task received', data)
     with scopes_disabled():
         refund = PaymentRefund.objects.get(id=data['refund_id'])
     student_name = data['student_name']
@@ -62,10 +70,10 @@ def send_enrollment_cancel_email(data):
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except:
-        import ipdb; ipdb.set_trace()
+        save_task_data('enrollment cancel task email sending failed', data)
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
     else:
+        save_task_data('enrollment cancel task email sending succeeded', data)
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
-
     refund.save()
     return refund
