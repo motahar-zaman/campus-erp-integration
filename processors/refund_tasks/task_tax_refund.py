@@ -76,4 +76,6 @@ def send_tax_refund_data(data):
     if resp.status_code == 200:
         refund.task_tax_refund = PaymentRefund.TASK_STATUS_DONE
 
+    print(resp.json())
+
     return resp
