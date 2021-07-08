@@ -62,6 +62,7 @@ def send_enrollment_cancel_email(data):
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except:
+        import ipdb; ipdb.set_trace()
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
     else:
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
