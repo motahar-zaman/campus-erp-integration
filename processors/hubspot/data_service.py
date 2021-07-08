@@ -4,7 +4,7 @@ from shared_models.models import Profile
 from status_logger import save_status_to_mongo
 import os
 import django
-
+from django_scopes import scopes_disabled
 
 # Django stuff begins
 DEBUG = True
@@ -47,11 +47,13 @@ def update_refund_status(data):
             break
 
     try:
-        cart = Cart.objects.get(id=cart_id)
+        with scopes_disabled():
+            cart = Cart.objects.get(id=cart_id)
     except Cart.DoesNotExist:
         pass
     else:
-        refund = PaymentRefund.objects.filter(payment__cart=cart).first()
+        with scopes_disabled():
+            refund = PaymentRefund.objects.filter(payment__cart=cart).first()
         refund.task_crm_update = PaymentRefund.TASK_STATUS_DONE
         refund.save()
 
