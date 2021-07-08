@@ -7,7 +7,6 @@ from .avatax.send_user_data import commit_transaction
 from .elastic_search.data_logger import upload_log
 
 from .refund_tasks.task_cancel_enrollment import send_enrollment_cancel_email
-from .refund_tasks.task_crm_update import send_cart_data
 from .refund_tasks.task_tax_refund import send_tax_refund_data
 
 
@@ -41,11 +40,6 @@ def requestlog_callback(ch, method, properties, body):
 def send_enrollment_cancel_email_callback(ch, method, properties, body):
     data = json.loads(body.decode())
     send_enrollment_cancel_email(data)
-
-
-def send_cart_data_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    send_cart_data(data)
 
 
 def send_tax_refund_data_callback(ch, method, properties, body):
