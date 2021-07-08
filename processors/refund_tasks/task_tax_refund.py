@@ -32,24 +32,28 @@ DATABASES = {
     }
 }
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
-django.setup()
-
-from shared_models.models import PaymentRefund
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = 'sakib@sgcsoft.net'
 EMAIL_HOST_PASSWORD = 'howyouturnthison'
-EMAIL_RECIPIENT_LIST = ['mamun@sgcsoft.net', 'sahidul@sgcsoft.net']
+EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com']
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
+django.setup()
+
+from shared_models.models import PaymentRefund
 # Django stuff ends
 
 
 def send_tax_refund_data(data):
     with scopes_disabled():
-        refund = PaymentRefund.objects.get(id=data['refund_id'])
+        try:
+            refund = PaymentRefund.objects.get(id=data['refund_id'])
+            del data['refund_id']
+        except PaymentRefund.DoesNotExist:
+            return {}
 
     accountid = config('AVATAX_ACCOUNT_ID')
     license_key = config('AVATAX_LICENSE_KEY')
@@ -59,6 +63,12 @@ def send_tax_refund_data(data):
     auth_header = {'Authorization': f'Basic {auth_str}'}
 
     url = config('AVATAX_URL')
+
+    company_code = config('AVATAX_COMPANY_CODE')
+    cart_id = data['refundTransactionCode']
+
+    splits = url.split('/')
+    url = '/'.join(splits[:-2]) + f'/companies/{company_code}/transactions/{cart_id}/refund'
 
     resp = requests.post(url, json=data, headers=auth_header)
 
