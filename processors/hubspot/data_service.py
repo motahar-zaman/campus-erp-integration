@@ -58,10 +58,6 @@ def update_refund_status(data):
         refund.save()
 
 
-
-
-
-
 def send_user_data(data):
     HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
     HUBSPOT_CONTACT_CREATION_FORM_ID = config('HUBSPOT_CONTACT_CREATION_FORM_ID')
