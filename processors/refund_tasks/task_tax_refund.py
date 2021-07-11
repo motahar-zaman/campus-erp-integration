@@ -66,7 +66,7 @@ def save_task_data(msg, data):
     connect(mongodb_database, host=mongodb_host, port=int(mongodb_port), username=mongodb_username, password=mongodb_password, authentication_source=mongodb_auth_database)
 
     db = get_db()
-    coll = db.get_collection('refundtasks')
+    coll = db.get_collection('debug')
     coll.insert_one({'message': msg, 'data': data})
 
 
