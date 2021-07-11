@@ -31,14 +31,6 @@ DATABASES = {
     }
 }
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_USE_TLS = True
-EMAIL_PORT = 587
-EMAIL_HOST_USER = 'sakib@sgcsoft.net'
-EMAIL_HOST_PASSWORD = 'howyouturnthison'
-EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
-
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
 django.setup()
 
@@ -81,17 +73,16 @@ def send_enrollment_cancel_email(data):
     subject = 'Enrollment cancellation request'
     message = f'Student name: {student_name}, Email: {student_email}, certificate: {certificate}, course: {course}'
 
-    email_from = EMAIL_HOST_USER
-    recipient_list = EMAIL_RECIPIENT_LIST
+    email_from = 'sakib@sgcsoft.net'
+    recipient_list = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
     try:
         from django.conf import settings
         settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
         settings.EMAIL_HOST = 'smtp.gmail.com'
         settings.EMAIL_USE_TLS = True
         settings.EMAIL_PORT = 587
-        settings.EMAIL_HOST_USER = 'sakib@sgcsoft.net'
+        settings.EMAIL_HOST_USER = email_from
         settings.EMAIL_HOST_PASSWORD = 'howyouturnthison'
-        settings.EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except Exception as e:
         save_task_data('enrollment cancel task email sending failed', data, str(e))
