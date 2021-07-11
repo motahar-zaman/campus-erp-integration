@@ -83,8 +83,15 @@ def send_enrollment_cancel_email(data):
 
     email_from = EMAIL_HOST_USER
     recipient_list = EMAIL_RECIPIENT_LIST
-    import ipdb; ipdb.set_trace()
     try:
+        from django.conf import settings
+        settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+        settings.EMAIL_HOST = 'smtp.gmail.com'
+        settings.EMAIL_USE_TLS = True
+        settings.EMAIL_PORT = 587
+        settings.EMAIL_HOST_USER = 'sakib@sgcsoft.net'
+        settings.EMAIL_HOST_PASSWORD = 'howyouturnthison'
+        settings.EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except Exception as e:
         save_task_data('enrollment cancel task email sending failed', data, str(e))
