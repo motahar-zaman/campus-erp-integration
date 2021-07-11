@@ -46,7 +46,7 @@ from shared_models.models import PaymentRefund
 # Django stuff ends
 
 
-def save_task_data(msg, data, err):
+def save_task_data(msg, data, err={}):
     from mongoengine import connect, disconnect, get_db
     from decouple import config, UndefinedValueError
 
