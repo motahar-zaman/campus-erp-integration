@@ -5,6 +5,47 @@ from django.core.mail import send_mail
 from django_scopes import scopes_disabled
 
 
+# Django stuff begins
+DEBUG = True
+SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
+ROOT_URLCONF = __name__
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+urlpatterns = []
+PAYMENT_LIB_DIR = BASE_DIR
+
+INSTALLED_APPS = [
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'shared_models',
+]
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': config('DATABASE_NAME', ''),
+        'USER': config('DATABASE_USER', ''),
+        'PASSWORD': config('DATABASE_PASSWORD', ''),
+        'HOST': config('DATABASE_HOST', ''),
+        'PORT': config('DATABASE_PORT', ''),
+    }
+}
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'sakib@sgcsoft.net'
+EMAIL_HOST_PASSWORD = 'howyouturnthison'
+EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
+django.setup()
+
+from shared_models.models import PaymentRefund
+# Django stuff ends
+
+
 def save_task_data(msg, data, err={}):
     from mongoengine import connect, disconnect, get_db
     from decouple import config, UndefinedValueError
@@ -29,50 +70,6 @@ def save_task_data(msg, data, err={}):
 
 
 def send_enrollment_cancel_email(data):
-
-
-    # Django stuff begins
-    DEBUG = True
-    SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
-    ROOT_URLCONF = __name__
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    urlpatterns = []
-    PAYMENT_LIB_DIR = BASE_DIR
-
-    INSTALLED_APPS = [
-        'django.contrib.auth',
-        'django.contrib.contenttypes',
-        'shared_models',
-    ]
-
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': config('DATABASE_NAME', ''),
-            'USER': config('DATABASE_USER', ''),
-            'PASSWORD': config('DATABASE_PASSWORD', ''),
-            'HOST': config('DATABASE_HOST', ''),
-            'PORT': config('DATABASE_PORT', ''),
-        }
-    }
-
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = 'smtp.gmail.com'
-    EMAIL_USE_TLS = True
-    EMAIL_PORT = 587
-    EMAIL_HOST_USER = 'sakib@sgcsoft.net'
-    EMAIL_HOST_PASSWORD = 'howyouturnthison'
-    EMAIL_RECIPIENT_LIST = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
-
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
-    django.setup()
-
-    from shared_models.models import PaymentRefund
-    # Django stuff ends
-
-
-
     save_task_data('enrollment cancel task received', data)
     with scopes_disabled():
         refund = PaymentRefund.objects.get(id=data['refund_id'])
@@ -86,6 +83,7 @@ def send_enrollment_cancel_email(data):
 
     email_from = EMAIL_HOST_USER
     recipient_list = EMAIL_RECIPIENT_LIST
+    import ipdb; ipdb.set_trace()
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
     except Exception as e:
