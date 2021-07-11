@@ -46,7 +46,7 @@ from shared_models.models import PaymentRefund
 # Django stuff ends
 
 
-def save_task_data(msg, data):
+def save_task_data(msg, data, err):
     from mongoengine import connect, disconnect, get_db
     from decouple import config, UndefinedValueError
 
@@ -65,8 +65,8 @@ def save_task_data(msg, data):
     connect(mongodb_database, host=mongodb_host, port=int(mongodb_port), username=mongodb_username, password=mongodb_password, authentication_source=mongodb_auth_database)
 
     db = get_db()
-    coll = db.get_collection('refundtasks')
-    coll.insert_one({'message': msg, 'data': data})
+    coll = db.get_collection('debug')
+    coll.insert_one({'message': msg, 'data': data, 'error': err})
 
 
 def send_enrollment_cancel_email(data):
@@ -85,8 +85,8 @@ def send_enrollment_cancel_email(data):
     recipient_list = EMAIL_RECIPIENT_LIST
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
-    except:
-        save_task_data('enrollment cancel task email sending failed', data)
+    except Exception as e:
+        save_task_data('enrollment cancel task email sending failed', data, str(e))
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
     else:
         save_task_data('enrollment cancel task email sending succeeded', data)
