@@ -39,25 +39,6 @@ from shared_models.models import Cart, PaymentRefund
 # Django stuff ends
 
 
-def update_refund_status(data):
-    cart_id = ''
-    for item in data['fields']:
-        if item['name'] == 'cart_id':
-            cart_id = item['value']
-            break
-
-    try:
-        with scopes_disabled():
-            cart = Cart.objects.get(id=cart_id)
-    except Cart.DoesNotExist:
-        pass
-    else:
-        with scopes_disabled():
-            refund = PaymentRefund.objects.filter(payment__cart=cart).first()
-        refund.task_crm_update = PaymentRefund.TASK_STATUS_DONE
-        refund.save()
-
-
 def send_user_data(data):
     HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
     HUBSPOT_CONTACT_CREATION_FORM_ID = config('HUBSPOT_CONTACT_CREATION_FORM_ID')
@@ -117,13 +98,29 @@ def send_product_data(data):
 
     url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_CREATION_FORM_ID}'
 
+    refund_id = None
+    refund = None
+
+    try:
+        refund_id = data['refund_id']
+    except KeyError:
+        pass
+    else:
+        try:
+            refund = PaymentRefund.objects.get(id=refund_id)
+        except PaymentRefund.DoesNotExist:
+            refund = None
+
+        del data['refund_id']
+
     resp = requests.post(url, json=data)
 
     if resp.status_code == 200:
         for item in data['fields']:
             if item['name'] == 'cart_status':
-                if item['value'] == 'refunded':
-                    update_refund_status(data)
+                if item['value'] == 'refunded' and refund:
+                    refund.task_crm_update = PaymentRefund.TASK_STATUS_DONE
+                    refund.save()
                     break
 
     return resp.status_code
