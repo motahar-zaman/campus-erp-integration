@@ -34,7 +34,7 @@ DATABASES = {
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
 django.setup()
 
-from shared_models.models import PaymentRefund
+from shared_models.models import PaymentRefund, Certificate, Course
 # Django stuff ends
 
 
@@ -67,28 +67,46 @@ def send_enrollment_cancel_email(data):
         refund = PaymentRefund.objects.get(id=data['refund_id'])
     student_name = data['student_name']
     student_email = data['student_email']
-    certificate = data['certificate']
-    course = data['course']
+    certificate_id = data['certificate']
+    course_id = data['course']
 
     subject = 'Enrollment cancellation request'
-    message = f'Student name: {student_name}, Email: {student_email}, certificate: {certificate}, course: {course}'
+    message = f'Student name: {student_name}\nEmail: {student_email}'
 
-    email_from = 'sakib@sgcsoft.net'
-    recipient_list = ['sakibccr@gmail.com', 'sahidul@sgcsoft.net']
-    try:
-        from django.conf import settings
-        settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-        settings.EMAIL_HOST = 'smtp.gmail.com'
-        settings.EMAIL_USE_TLS = True
-        settings.EMAIL_PORT = 587
-        settings.EMAIL_HOST_USER = email_from
-        settings.EMAIL_HOST_PASSWORD = 'howyouturnthison'
-        send_mail(subject, message, email_from, recipient_list, fail_silently=False)
-    except Exception as e:
-        save_task_data('enrollment cancel task email sending failed', data, str(e))
-        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
+    recipients = []
+
+    if certificate_id != '':
+        message = f'{message}\nCertificate: {certificate_id}'
+        certificate = Certificate.objects.get(id=certificate_id)
+
+        if certificate.course_provider.refund_email is not None:
+            recipients.append(certificate.course_provider.refund_email)
+
+    if course_id != '':
+        message = f'{message}\nCourse: {course_id}'
+        course = Course.objects.get(id=course_id)
+
+        if course.course_provider.refund_email is not None:
+            recipients.append(course.course_provider.refund_email)
+
+    if len(recipients):
+        try:
+            from django.conf import settings
+            settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+            settings.EMAIL_HOST = config('EMAIL_HOST')
+            settings.EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
+            settings.EMAIL_PORT = config('EMAIL_PORT', cast=int)
+            settings.EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+            settings.EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+            send_mail(subject, message, config('EMAIL_HOST_USER'), recipients, fail_silently=False)
+        except Exception as e:
+            save_task_data('enrollment cancel task email sending failed', data, str(e))
+            refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
+        else:
+            save_task_data('enrollment cancel task email sending succeeded', data)
+            refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
     else:
-        save_task_data('enrollment cancel task email sending succeeded', data)
-        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
+        save_task_data('course provider has no refund email', data)
+        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
     refund.save()
     return refund
