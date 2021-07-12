@@ -77,14 +77,16 @@ def send_enrollment_cancel_email(data):
 
     if certificate_id != '':
         message = f'{message}\nCertificate: {certificate_id}'
-        certificate = Certificate.objects.get(id=certificate_id)
+        with scopes_disabled():
+            certificate = Certificate.objects.get(id=certificate_id)
 
         if certificate.course_provider.refund_email is not None:
             recipients.append(certificate.course_provider.refund_email)
 
     if course_id != '':
         message = f'{message}\nCourse: {course_id}'
-        course = Course.objects.get(id=course_id)
+        with scopes_disabled():
+            course = Course.objects.get(id=course_id)
 
         if course.course_provider.refund_email is not None:
             recipients.append(course.course_provider.refund_email)
