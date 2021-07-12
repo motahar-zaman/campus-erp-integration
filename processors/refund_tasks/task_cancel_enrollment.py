@@ -95,12 +95,12 @@ def send_enrollment_cancel_email(data):
         try:
             from django.conf import settings
             settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-            settings.EMAIL_HOST = config('EMAIL_HOST')
-            settings.EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
-            settings.EMAIL_PORT = config('EMAIL_PORT', cast=int)
-            settings.EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-            settings.EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-            send_mail(subject, message, config('EMAIL_HOST_USER'), recipients, fail_silently=False)
+            settings.EMAIL_HOST = config('SMTP_HOST')
+            settings.EMAIL_USE_TLS = config('SMTP_USE_TLS', cast=bool)
+            settings.EMAIL_PORT = config('SMTP_PORT', cast=int)
+            settings.EMAIL_HOST_USER = config('SMTP_HOST_USER')
+            settings.EMAIL_HOST_PASSWORD = config('SMTP_HOST_PASSWORD')
+            send_mail(subject, message, config('SMTP_HOST_USER'), recipients, fail_silently=False)
         except Exception as e:
             save_task_data('enrollment cancel task email sending failed', data, str(e))
             refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
