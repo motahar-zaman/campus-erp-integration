@@ -1,6 +1,5 @@
 import requests
 from decouple import config
-from shared_models.models import Profile
 from status_logger import save_status_to_mongo
 import os
 import django
@@ -35,7 +34,7 @@ DATABASES = {
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)
 django.setup()
 
-from shared_models.models import Cart, PaymentRefund
+from shared_models.models import Profile, Cart, PaymentRefund
 # Django stuff ends
 
 
@@ -107,7 +106,8 @@ def send_product_data(data):
         pass
     else:
         try:
-            refund = PaymentRefund.objects.get(id=refund_id)
+            with scopes_disabled():
+                refund = PaymentRefund.objects.get(id=refund_id)
         except PaymentRefund.DoesNotExist:
             refund = None
 
