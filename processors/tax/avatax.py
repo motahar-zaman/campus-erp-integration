@@ -1,10 +1,16 @@
+from django_scopes import scopes_disabled
+from decouple import config
 import requests
 import base64
 from django.utils import timezone
-from decouple import config
+
+from django_initializer import initialize_django
+initialize_django()
+
+from shared_models.models import PaymentRefund
 
 
-def commit_transaction(data):
+def tax_create(data):
     accountid = config('AVATAX_ACCOUNT_ID')
     license_key = config('AVATAX_LICENSE_KEY')
     tax_code = config('AVATAX_TAX_CODE')
@@ -49,3 +55,34 @@ def commit_transaction(data):
     resp = requests.post(url, json=payload, headers=auth_header)
 
     return resp.status_code
+
+
+def tax_refund(data):
+    with scopes_disabled():
+        try:
+            refund = PaymentRefund.objects.get(id=data['refund_id'])
+            del data['refund_id']
+        except PaymentRefund.DoesNotExist:
+            return {}
+
+    accountid = config('AVATAX_ACCOUNT_ID')
+    license_key = config('AVATAX_LICENSE_KEY')
+
+    auth_str = base64.b64encode(f'{accountid}:{license_key}'.encode('ascii')).decode('ascii')
+
+    auth_header = {'Authorization': f'Basic {auth_str}'}
+
+    url = config('AVATAX_URL')
+
+    company_code = config('AVATAX_COMPANY_CODE')
+    cart_id = data['refundTransactionCode']
+
+    splits = url.split('/')
+    url = '/'.join(splits[:-2]) + f'/companies/{company_code}/transactions/{cart_id}/refund'
+
+    resp = requests.post(url, json=data, headers=auth_header)
+
+    refund.task_tax_refund = PaymentRefund.TASK_STATUS_FAILED
+    if resp.status_code == 200:
+        refund.task_tax_refund = PaymentRefund.TASK_STATUS_DONE
+    return resp
