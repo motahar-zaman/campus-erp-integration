@@ -1,35 +1,14 @@
 import json
-from status_logger import save_status_to_mongo
-from .mindedge.enrollment import enroll
-from .hubspot.data_service import send_user_data, send_product_data
-from .avatax.send_user_data import commit_transaction
 
-from .elastic_search.data_logger import upload_log
+from formatters.enrollment import EnrollmentFormatter
+from formatters.crm import CRMFormatter
+from formatters.tax import TaxFormatter
 
-from .refund_tasks.task_cancel_enrollment import send_enrollment_cancel_email
-from .refund_tasks.task_tax_refund import send_tax_refund_data
+from processors.enrollment.mindedge import enroll, unenroll
+from processors.crm.hubspot import add_or_update_user, add_or_update_product
+from processors.tax.avatax import tax_create, tax_refund
 
-
-def mindedge_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    status_data = {'comment': 'received', 'data': data}
-    save_status_to_mongo(status_data)
-    enroll(data)
-
-
-def hubspot_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    send_user_data(data)
-
-
-def product_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    send_product_data(data)
-
-
-def avatax_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    commit_transaction(data)
+from loggers.elastic_search import upload_log
 
 
 def requestlog_callback(ch, method, properties, body):
@@ -37,11 +16,42 @@ def requestlog_callback(ch, method, properties, body):
     upload_log(data)
 
 
-def send_enrollment_cancel_email_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    send_enrollment_cancel_email(data)
+def enroll_callback(ch, method, properties, body):
+    payload = json.loads(body.decode())
+
+    if 'enrollment' in method.routing_key:
+        formatter = EnrollmentFormatter()
+        data = formatter.enroll(payload)
+        enroll(data)
+
+    if 'crm_user' in method.routing_key:
+        formatter = CRMFormatter()
+        data = formatter.add_or_update_user(payload)
+        add_or_update_user(data)
+
+    if 'crm_product' in method.routing_key:
+        formatter = CRMFormatter()
+        data = formatter.add_or_update_product(payload)
+        add_or_update_product(data)
+
+    if 'tax' in method.routing_key:
+        tax_create(data)
 
 
-def send_tax_refund_data_callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    send_tax_refund_data(data)
+def refund_callback(ch, method, properties, body):
+    payload = json.loads(body.decode())
+
+    if 'email' in method.routing_key:
+        formatter = EnrollmentFormatter()
+        data = formatter.unenroll(payload)
+        unenroll(data)
+
+    if 'crm_product' in method.routing_key:
+        formatter = CRMFormatter()
+        data = formatter.add_or_update_product(payload)
+        add_or_update_product(data)
+
+    if 'tax' in method.routing_key:
+        formatter = TaxFormatter()
+        data = formatter.tax_refund(payload)
+        tax_refund(data)
