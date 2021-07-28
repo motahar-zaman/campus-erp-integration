@@ -1,3 +1,6 @@
+from django_initializer import initialize_django
+initialize_django()
+
 from shared_models.models import PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile
 from django_scopes import scopes_disabled
 
@@ -14,7 +17,7 @@ class EnrollmentFormatter(object):
                 'cid': payload['external_id']
             },
             'erp': 'mindedge',
-            'profile': profile,
+            'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
             'action': 'enroll',
             'enrollment_type': 'course',
             'enrollment_id': payload['course_enrollment_id'],
@@ -25,7 +28,7 @@ class EnrollmentFormatter(object):
     def unenroll(self, payload):
         with scopes_disabled():
             try:
-                refund = PaymentRefund.objects.get(payload['refund_id'])
+                refund = PaymentRefund.objects.get(id=payload['refund_id'])
             except KeyError:
                 return {}
             except PaymentRefund.DoesNotExist:

@@ -1,25 +1,30 @@
+from django_initializer import initialize_django
+initialize_django()
+
+from django_scopes import scopes_disabled
 from shared_models.models import PaymentRefund, Cart, StoreCourseSection, Product
 from django.utils import timezone
 
 
 class TaxFormatter(object):
     def tax_create(self, payload):
-        try:
-            cart = Cart.objects.get(id=payload['cart_id'])
-        except Cart.DoesNotExist:
-            return {}
+        with scopes_disabled():
+            try:
+                cart = Cart.objects.get(id=payload['cart_id'])
+            except Cart.DoesNotExist:
+                return {}
 
-        try:
-            product = Product.objects.get(id=payload['product_id'])
-        except Product.DoesNotExist:
-            return {}
+            try:
+                product = Product.objects.get(id=payload['product_id'])
+            except Product.DoesNotExist:
+                return {}
 
-        description = ''
-        try:
-            store_course_section = StoreCourseSection.objects.get(id=payload['store_course_section_id'])
-            description = store_course_section.store_course.course.title + ' (' + store_course_section.store_course.course.course_provider.name + ')'
-        except StoreCourseSection.DoesNotExist:
-            pass
+            description = ''
+            try:
+                store_course_section = StoreCourseSection.objects.get(id=payload['store_course_section_id'])
+                description = store_course_section.store_course.course.title + ' (' + store_course_section.store_course.course.course_provider.name + ')'
+            except StoreCourseSection.DoesNotExist:
+                pass
 
         address = cart.profile.profileaddress_set.all().first()
 
@@ -35,12 +40,11 @@ class TaxFormatter(object):
         return data
 
     def tax_refund(self, payload):
-        try:
-            refund = PaymentRefund.objects.get(payload['refund_id'])
-        except KeyError:
-            return {}
-        except PaymentRefund.DoesNotExist:
-            return {}
+        with scopes_disabled():
+            try:
+                refund = PaymentRefund.objects.get(id=payload['refund_id'])
+            except PaymentRefund.DoesNotExist:
+                return {}
 
         data = {
             'refund_id': str(refund.id),
