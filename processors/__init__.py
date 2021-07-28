@@ -3,10 +3,12 @@ import json
 from formatters.enrollment import EnrollmentFormatter
 from formatters.crm import CRMFormatter
 from formatters.tax import TaxFormatter
+from formatters.importers import ImportFormatter
 
 from processors.enrollment.mindedge import enroll, unenroll
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
+from processors.importers.contents import import_courses
 
 from loggers.elastic_search import upload_log
 
@@ -70,4 +72,15 @@ def refund_callback(ch, method, properties, body):
         formatter = TaxFormatter()
         data = formatter.tax_refund(payload)
         tax_refund(data)
+        print('Done')
+
+
+def import_callback(ch, method, properties, body):
+    payload = json.loads(body.decode())
+
+    if 'course' in method.routing_key:
+        print('* Importing course')
+        formatter = ImportFormatter()
+        import_task = formatter.course(payload)
+        import_courses(import_task)
         print('Done')

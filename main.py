@@ -2,7 +2,7 @@ import pika
 import sys
 import os
 from decouple import config
-from processors import enroll_callback, refund_callback
+from processors import enroll_callback, refund_callback, import_callback
 
 
 def main():
@@ -27,6 +27,11 @@ def main():
     enroll_queue = channel.queue_declare('', exclusive=True)
     channel.queue_bind(exchange='campusmq', queue=enroll_queue.method.queue, routing_key='*.enroll')
     channel.basic_consume(queue=enroll_queue.method.queue, on_message_callback=enroll_callback, auto_ack=True)
+
+
+    import_queue = channel.queue_declare('', exclusive=True)
+    channel.queue_bind(exchange='campusmq', queue=import_queue.method.queue, routing_key='*.import')
+    channel.basic_consume(queue=import_queue.method.queue, on_message_callback=import_callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
