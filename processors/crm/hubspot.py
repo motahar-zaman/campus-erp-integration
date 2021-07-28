@@ -7,6 +7,7 @@ from django_initializer import initialize_django
 initialize_django()
 
 from shared_models.models import Profile, PaymentRefund
+from django.core.exceptions import ValidationError
 
 
 def add_or_update_user(data):
@@ -76,11 +77,13 @@ def add_or_update_product(data):
     except KeyError:
         pass
     else:
-        try:
-            with scopes_disabled():
+        with scopes_disabled():
+            try:
                 refund = PaymentRefund.objects.get(id=refund_id)
-        except PaymentRefund.DoesNotExist:
-            refund = None
+            except PaymentRefund.DoesNotExist:
+                refund = None
+            except ValidationError:
+                refund = None
 
         del data['refund_id']
 

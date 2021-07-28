@@ -1,6 +1,7 @@
 import os
 import django
 from decouple import config
+from mongoengine import connect, disconnect
 
 DEBUG = True
 SECRET_KEY = '4l0ngs3cr3tstr1ngw3lln0ts0l0ngw41tn0w1tsl0ng3n0ugh'
@@ -27,7 +28,19 @@ DATABASES = {
     }
 }
 
+
 def initialize_django():
+    # connect to mongodb
+
+    mongodb_host = config('MONGODB_HOST')
+    mongodb_database = config('MONGODB_DATABASE')
+    mongodb_port = config('MONGODB_PORT')
+    mongodb_username = config('MONGODB_USERNAME')
+    mongodb_password = config('MONGODB_PASSWORD')
+    mongodb_auth_database = config('MONGODB_AUTH_DATABASE')
+
+    disconnect()
+    connect(mongodb_database, host=mongodb_host, port=int(mongodb_port), username=mongodb_username, password=mongodb_password, authentication_source=mongodb_auth_database)
 
     # Django stuff begins
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', __name__)

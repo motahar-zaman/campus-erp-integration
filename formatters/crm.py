@@ -1,3 +1,6 @@
+from django_initializer import initialize_django
+initialize_django()
+
 from shared_models.models import Cart, StoreCourseSection, StoreCertificate, Payment, PaymentRefund
 from models.course.course import Course as CourseModel
 
@@ -55,10 +58,11 @@ class CRMFormatter(object):
 
     def add_or_update_product(self, payload):
         if payload['refund_id']:
-            try:
-                refund = PaymentRefund.objects.get(id=payload['refund_id'])
-            except PaymentRefund.DoesNotExist:
-                return {}
+            with scopes_disabled():
+                try:
+                    refund = PaymentRefund.objects.get(id=payload['refund_id'])
+                except PaymentRefund.DoesNotExist:
+                    return {}
 
             payment = refund.payment
             cart = payment.cart
@@ -67,18 +71,19 @@ class CRMFormatter(object):
             refund_id = payload['refund_id']
 
         else:
-            try:
-                cart = Cart.objects.get(payload['cart_id'])
-            except Cart.DoesNotExist:
-                return {}
+            with scopes_disabled():
+                try:
+                    cart = Cart.objects.get(id=payload['cart_id'])
+                except Cart.DoesNotExist:
+                    return {}
 
             cart_status = cart.status
             refund_id = ''
-
-            try:
-                payment = Payment.objects.get(payload['payment_id'])
-            except Payment.DoesNotExist:
-                payment = None
+            with scopes_disabled():
+                try:
+                    payment = Payment.objects.get(id=payload['payment_id'])
+                except Payment.DoesNotExist:
+                    payment = None
 
         if cart.cart_items.all().exists():
             item = cart.cart_items.first()  # since all cart will have only one item
