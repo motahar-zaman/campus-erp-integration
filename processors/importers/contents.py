@@ -24,6 +24,20 @@ def import_courses(import_task):
         try:
             course_model = CourseModel.objects.get(slug=data['slug'])
         except CourseModel.DoesNotExist:
-            course_model = CourseModel.objects.create(**data)
+            try:
+                course_model = CourseModel.objects.create(**data)
+                import_task.status = 'Success'
+            except:
+                import_task.status = 'Failed'
+                import_task.status_message = 'validation error'
+                break
         else:
-            course_model.update(**data)
+            try:
+                course_model.update(**data)
+                import_task.status = 'Success'
+            except:
+                import_task.status = 'Failed'
+                import_task.status_message = 'validation error'
+                break
+
+    import_task.save()
