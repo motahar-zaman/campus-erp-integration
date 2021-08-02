@@ -8,7 +8,7 @@ from formatters.importers import ImportFormatter
 from processors.enrollment.mindedge import enroll, unenroll
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
-from processors.importers.contents import import_courses
+from processors.importers.contents import import_courses_mongo, import_courses_postgres
 
 from loggers.elastic_search import upload_log
 
@@ -78,9 +78,16 @@ def refund_callback(ch, method, properties, body):
 def import_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
-    if 'course' in method.routing_key:
-        print('* Importing course')
+    if 'course_mongo' in method.routing_key:
+        print('* Importing course to mongo')
         formatter = ImportFormatter()
         import_task = formatter.course(payload)
-        import_courses(import_task)
+        import_courses_mongo(import_task)
+        print('Done')
+
+    if 'course_postgres' in method.routing_key:
+        print('* Importing course to postgres')
+        formatter = ImportFormatter()
+        import_task = formatter.course(payload)
+        import_courses_postgres(import_task)
         print('Done')
