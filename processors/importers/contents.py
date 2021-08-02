@@ -4,6 +4,7 @@ from decouple import config
 from bson import ObjectId
 import csv
 import urllib.request
+from loggers.mongo import save_status_to_mongo
 
 from django_initializer import initialize_django
 initialize_django()
@@ -55,7 +56,11 @@ def import_courses_mongo(import_task):
                 course_model = CourseModel.objects.create(**data)
             except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = data['external_id'] + ': ' + str(e)
+
+                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+
+                import_task.status_message = data['external_id'] + ': create error'
                 import_task.save()
                 break
 
@@ -69,7 +74,11 @@ def import_courses_mongo(import_task):
                 course_model.update(**data)
             except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = data['external_id'] + ': ' + str(e)
+
+                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+
+                import_task.status_message = data['external_id'] + ': update error'
                 import_task.save()
                 break
 

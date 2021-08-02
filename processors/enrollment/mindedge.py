@@ -37,13 +37,13 @@ def enroll(message_data):
         data = message_data['data']
         action = message_data['action']
     except KeyError:
-        save_status_to_mongo({'comment': 'unknown data format'})
+        save_status_to_mongo(status_data={'comment': 'unknown data format'})
         return 1
 
     try:
         erp_config = configs[erp]
     except KeyError:
-        save_status_to_mongo({'comment': erp + ' not implemented'})
+        save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
         return 1
 
     processor_class = erp_config['processor_class']
@@ -62,17 +62,17 @@ def enroll(message_data):
 
         enrollment.save()
         status_data = {'comment': 'authentication_failed', 'data': credentials}
-        save_status_to_mongo(status_data)
+        save_status_to_mongo(status_data=status_data)
         return 0
 
     status_data = {'comment': 'erp_authenticated', 'data': credentials}
-    save_status_to_mongo(status_data)
+    save_status_to_mongo(status_data=status_data)
     action = getattr(processor_obj, action)
     resp = action()
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
         status_data = {'comment': 'failed', 'data': resp}
-        save_status_to_mongo(status_data)
+        save_status_to_mongo(status_data=status_data)
 
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
@@ -84,7 +84,7 @@ def enroll(message_data):
         return 0
 
     status_data = {'comment': 'enrolled', 'data': resp}
-    save_status_to_mongo(status_data)
+    save_status_to_mongo(status_data=status_data)
 
     if message_data['enrollment_type'] == 'course':
         enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
@@ -111,7 +111,7 @@ def enroll(message_data):
         enrollment.status = CourseEnrollment.STATUS_SUCCESS
 
         status_data = {'comment': 'lms_created'}
-        save_status_to_mongo(status_data)
+        save_status_to_mongo(status_data=status_data)
 
         LMSAccess.objects.update_or_create(
             course_enrollment=enrollment,
