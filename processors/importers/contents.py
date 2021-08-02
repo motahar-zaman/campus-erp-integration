@@ -13,6 +13,23 @@ from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 
 
+def create_queue_postgres(import_task):
+    # create task for importing to postgres
+    amqp_user = config('AMQP_USER')
+    amqp_pass = config('AMQP_PASS')
+    amqp_host = config('AMQP_HOST')
+    amqp_port = config('AMQP_PORT')
+    amqp_url = f'amqps://{amqp_user}:{amqp_pass}@{amqp_host}:{amqp_port}?connection_attempts=5&retry_delay=5'
+
+    connection = pika.BlockingConnection(pika.URLParameters(amqp_url))
+    channel = connection.channel()
+    channel.exchange_declare(exchange='campusmq', exchange_type='topic')
+    channel.basic_publish(exchange='campusmq', routing_key='course_postgres.import', body=json.dumps({'import_task_id': str(import_task.id)}))
+    print('Published data to MQ, closing connection')
+    connection.close()
+    print('Done')
+
+
 def import_courses_mongo(import_task):
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus.com/uploads/'
@@ -30,42 +47,35 @@ def import_courses_mongo(import_task):
         data['from_importer'] = True
         data['keywords'] = []
         data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+        data['_is_deleted'] = False
         try:
-            course_model = CourseModel.objects.get(external_id=data['external_id'], provider=data['provider'])
+            course_model = CourseModel.with_deleted_objects.get(external_id=data['external_id'], provider=data['provider'])
         except CourseModel.DoesNotExist:
             try:
                 course_model = CourseModel.objects.create(**data)
-                import_task.status = 'Success'
-            except:
+            except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = 'validation error'
+                import_task.status_message = str(e)
                 break
+
+            else:
+                import_task.status = 'Success'
+                import_task.queue_processed = 1
+                import_task.save()
+                import_courses_mongo(import_task)
         else:
             try:
                 course_model.update(**data)
-                import_task.status = 'Success'
-            except:
+            except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = 'validation error'
+                import_task.status_message = str(e)
                 break
 
-    import_task.queue_processed = 1
-    import_task.save()
-
-    # create task for importing to postgres
-    amqp_user = config('AMQP_USER')
-    amqp_pass = config('AMQP_PASS')
-    amqp_host = config('AMQP_HOST')
-    amqp_port = config('AMQP_PORT')
-    amqp_url = f'amqps://{amqp_user}:{amqp_pass}@{amqp_host}:{amqp_port}?connection_attempts=5&retry_delay=5'
-
-    connection = pika.BlockingConnection(pika.URLParameters(amqp_url))
-    channel = connection.channel()
-    channel.exchange_declare(exchange='campusmq', exchange_type='topic')
-    channel.basic_publish(exchange='campusmq', routing_key='course_postgres.import', body=json.dumps({'import_task_id': str(import_task.id)}))
-    print('Published data to MQ, closing connection')
-    connection.close()
-    print('Done')
+            else:
+                import_task.status = 'Success'
+                import_task.queue_processed = 1
+                import_task.save()
+                import_courses_mongo(import_task)
 
 
 def import_courses_postgres(import_task):
