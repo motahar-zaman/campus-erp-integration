@@ -40,8 +40,10 @@ def import_courses_mongo(import_task):
     lines = [line.decode('utf-8') for line in response.readlines()]
     cr = csv.DictReader(lines)
     items = list(cr)
+    print('got data from csv file')
 
     for data in items:
+        print('importing: ')
         data = {k.strip(): v.strip() for (k, v) in data.items()}
         data['image'] = {'original': data['image']}
         data['default_image'] = {'original': data['default_image']}
@@ -52,9 +54,13 @@ def import_courses_mongo(import_task):
         try:
             course_model = CourseModel.with_deleted_objects.get(external_id=data['external_id'], provider=data['provider'])
         except CourseModel.DoesNotExist:
+            print('course model does not exist')
             try:
+                print('creating new course model')
                 course_model = CourseModel.objects.create(**data)
+                print('created')
             except Exception as e:
+                print('create failed: ', str(e))
                 import_task.status = 'Failed'
 
                 msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
@@ -65,14 +71,18 @@ def import_courses_mongo(import_task):
                 break
 
             else:
+                print('create Successful')
                 import_task.status = 'Success'
                 import_task.queue_processed = 1
                 import_task.save()
                 create_queue_postgres(import_task)
         else:
+            print('course model exists')
             try:
+                print('updating course model')
                 course_model.update(**data)
             except Exception as e:
+                print('update failed: ', str(e))
                 import_task.status = 'Failed'
 
                 msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
@@ -83,6 +93,7 @@ def import_courses_mongo(import_task):
                 break
 
             else:
+                print('update Successful')
                 import_task.status = 'Success'
                 import_task.queue_processed = 1
                 import_task.save()
