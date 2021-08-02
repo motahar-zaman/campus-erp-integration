@@ -55,7 +55,8 @@ def import_courses_mongo(import_task):
                 course_model = CourseModel.objects.create(**data)
             except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = str(e)
+                import_task.status_message = data['external_id'] + ': ' + str(e)
+                import_task.save()
                 break
 
             else:
@@ -68,7 +69,8 @@ def import_courses_mongo(import_task):
                 course_model.update(**data)
             except Exception as e:
                 import_task.status = 'Failed'
-                import_task.status_message = str(e)
+                import_task.status_message = data['external_id'] + ': ' + str(e)
+                import_task.save()
                 break
 
             else:
