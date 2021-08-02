@@ -19,13 +19,13 @@ def add_or_update_user(data):
     try:
         profile_id = data['profile_id']
     except KeyError:
-        save_status_to_mongo({'comment': 'unknown data format'})
+        save_status_to_mongo(status_data={'comment': 'unknown data format'})
         return
 
     try:
         profile = Profile.objects.get(id=profile_id)
     except Profile.DoesNotExist:
-        save_status_to_mongo({'comment': 'profile not found'})
+        save_status_to_mongo(status_data={'comment': 'profile not found'})
         return
 
     data = {
@@ -55,10 +55,10 @@ def add_or_update_user(data):
 
     resp = requests.post(url, json=data)
     if resp.status_code == 200:
-        save_status_to_mongo({'comment': 'success', 'data': resp.json()})
+        save_status_to_mongo(status_data={'comment': 'success', 'data': resp.json()})
 
     else:
-        save_status_to_mongo({'comment': 'failed', 'data': resp.json()})
+        save_status_to_mongo(status_data={'comment': 'failed', 'data': resp.json()})
 
     return resp.status_code
 

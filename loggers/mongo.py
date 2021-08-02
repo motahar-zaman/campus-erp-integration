@@ -2,7 +2,7 @@ from mongoengine import connect, disconnect, get_db
 from decouple import config, UndefinedValueError
 
 
-def save_status_to_mongo(status_data=None):
+def save_status_to_mongo(status_data=None, collection='EnrollmentStatusHistory'):
     print('logging status to mongo')
     return 0
     try:
@@ -20,5 +20,5 @@ def save_status_to_mongo(status_data=None):
     connect(mongodb_database, host=mongodb_host, port=int(mongodb_port), username=mongodb_username, password=mongodb_password, authentication_source=mongodb_auth_database)
 
     db = get_db()
-    coll = db.get_collection('EnrollmentStatusHistory')
+    coll = db.get_collection(collection)
     coll.insert_one(status_data)
