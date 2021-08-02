@@ -9,6 +9,7 @@ from django_initializer import initialize_django
 initialize_django()
 
 from shared_models.models import Course
+from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 
 
@@ -90,28 +91,29 @@ def import_courses_postgres(import_task):
         except CourseModel.DoesNotExist:
             pass
         else:
-            try:
-                course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
-            except Course.DoesNotExist:
-                course = Course.objects.create(
-                    course_provider=import_task.course_provider,
-                    title=course_model.title,
-                    slug=course_model.slug,
-                    content_db_reference=str(course_model.id),
-                    course_image_uri=course_model.image['original'],
-                    content_ready=False,
-                    external_image_url=course_model.default_image,
-                )
-                import_task.queue_processed = 2
-            else:
-                course.course_provider = import_task.course_provider
-                course.title = course_model.title
-                course.slug = course_model.slug
-                course.content_db_reference = str(course_model.id)
-                course.course_image_uri = course_model.image['original']
-                course.content_ready = False
-                course.external_image_url = course_model.default_image
-                course.save()
-                import_task.queue_processed = 2
+            with scopes_disabled():
+                try:
+                    course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
+                except Course.DoesNotExist:
+                    course = Course.objects.create(
+                        course_provider=import_task.course_provider,
+                        title=course_model.title,
+                        slug=course_model.slug,
+                        content_db_reference=str(course_model.id),
+                        course_image_uri=course_model.image['original'],
+                        content_ready=False,
+                        external_image_url=course_model.default_image,
+                    )
+                    import_task.queue_processed = 2
+                else:
+                    course.course_provider = import_task.course_provider
+                    course.title = course_model.title
+                    course.slug = course_model.slug
+                    course.content_db_reference = str(course_model.id)
+                    course.course_image_uri = course_model.image['original']
+                    course.content_ready = False
+                    course.external_image_url = course_model.default_image
+                    course.save()
+                    import_task.queue_processed = 2
 
     import_task.save()
