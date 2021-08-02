@@ -68,7 +68,7 @@ def import_courses_mongo(import_task):
                 import_task.status = 'Success'
                 import_task.queue_processed = 1
                 import_task.save()
-                import_courses_mongo(import_task)
+                create_queue_postgres(import_task)
         else:
             try:
                 course_model.update(**data)
@@ -86,7 +86,7 @@ def import_courses_mongo(import_task):
                 import_task.status = 'Success'
                 import_task.queue_processed = 1
                 import_task.save()
-                import_courses_mongo(import_task)
+                create_queue_postgres(import_task)
 
 
 def import_courses_postgres(import_task):
