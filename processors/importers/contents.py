@@ -5,7 +5,7 @@ from bson import ObjectId
 import csv
 import urllib.request
 from loggers.mongo import save_status_to_mongo
-
+from config import mongo_client
 from django_initializer import initialize_django
 initialize_django()
 
@@ -42,62 +42,70 @@ def import_courses_mongo(import_task):
     items = list(cr)
     print('got data from csv file')
 
-    for data in items:
-        print('importing: ')
-        data = {k.strip(): v.strip() for (k, v) in data.items()}
-        data['image'] = {'original': data['image']}
-        data['default_image'] = {'original': data['default_image']}
-        data['from_importer'] = True
-        data['keywords'] = []
-        data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
-        data['_is_deleted'] = False
-        try:
-            course_model = CourseModel.with_deleted_objects.get(external_id=data['external_id'], provider=data['provider'])
-        except CourseModel.DoesNotExist:
-            print('course model does not exist')
+    try:
+        mongo_client.connect_mongodb()
+        for data in items:
+            print('importing: ')
+            data = {k.strip(): v.strip() for (k, v) in data.items()}
+            data['image'] = {'original': data['image']}
+            data['default_image'] = {'original': data['default_image']}
+            data['from_importer'] = True
+            data['keywords'] = []
+            data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+            data['_is_deleted'] = False
             try:
-                print('creating new course model')
-                course_model = CourseModel.objects.create(**data)
-                print('created')
-            except Exception as e:
-                print('create failed: ', str(e))
-                import_task.status = 'Failed'
+                course_model = CourseModel.with_deleted_objects.get(external_id=data['external_id'], provider=data['provider'])
+            except CourseModel.DoesNotExist:
+                print('course model does not exist')
+                try:
+                    print('creating new course model')
+                    print(data)
+                    obj = CourseModel.objects(external_id=data['external_id'], provider=data['provider'])
+                    raw_query = {'$set': data}
+                    obj.update_one(__raw__=raw_query, upsert=True)
+                    # course_model = CourseModel.objects.create(**data)
+                    print('created')
+                except Exception as e:
+                    print('create failed: ', str(e))
+                    import_task.status = 'Failed'
 
-                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
-                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                    msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                    save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
 
-                import_task.status_message = data['external_id'] + ': create error'
-                import_task.save()
-                break
+                    import_task.status_message = data['external_id'] + ': create error'
+                    import_task.save()
+                    break
 
+                else:
+                    print('create Successful')
+                    import_task.status = 'Success'
+                    import_task.queue_processed = 1
+                    import_task.save()
+                    create_queue_postgres(import_task)
             else:
-                print('create Successful')
-                import_task.status = 'Success'
-                import_task.queue_processed = 1
-                import_task.save()
-                create_queue_postgres(import_task)
-        else:
-            print('course model exists')
-            try:
-                print('updating course model')
-                course_model.update(**data)
-            except Exception as e:
-                print('update failed: ', str(e))
-                import_task.status = 'Failed'
+                print('course model exists')
+                try:
+                    print('updating course model')
+                    course_model.update(**data)
+                except Exception as e:
+                    print('update failed: ', str(e))
+                    import_task.status = 'Failed'
 
-                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
-                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                    msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                    save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
 
-                import_task.status_message = data['external_id'] + ': update error'
-                import_task.save()
-                break
+                    import_task.status_message = data['external_id'] + ': update error'
+                    import_task.save()
+                    break
 
-            else:
-                print('update Successful')
-                import_task.status = 'Success'
-                import_task.queue_processed = 1
-                import_task.save()
-                create_queue_postgres(import_task)
+                else:
+                    print('update Successful')
+                    import_task.status = 'Success'
+                    import_task.queue_processed = 1
+                    import_task.save()
+                    create_queue_postgres(import_task)
+    finally:
+        mongo_client.disconnect_mongodb()
 
 
 def import_courses_postgres(import_task):
@@ -110,42 +118,46 @@ def import_courses_postgres(import_task):
     cr = csv.DictReader(lines)
     items = list(cr)
 
-    for data in items:
-        data = {k.strip(): v.strip() for (k, v) in data.items()}
-        data['image'] = {'original': data['image']}
-        data['default_image'] = {'original': data['default_image']}
-        data['from_importer'] = True
-        data['keywords'] = []
-        data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+    try:
+        mongo_client.connect_mongodb()
+        for data in items:
+            data = {k.strip(): v.strip() for (k, v) in data.items()}
+            data['image'] = {'original': data['image']}
+            data['default_image'] = {'original': data['default_image']}
+            data['from_importer'] = True
+            data['keywords'] = []
+            data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
 
-        try:
-            course_model = CourseModel.objects.get(external_id=data['external_id'], provider=data['provider'])
-        except CourseModel.DoesNotExist:
-            pass
-        else:
-            with scopes_disabled():
-                try:
-                    course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
-                except Course.DoesNotExist:
-                    course = Course.objects.create(
-                        course_provider=import_task.course_provider,
-                        title=course_model.title,
-                        slug=course_model.slug,
-                        content_db_reference=str(course_model.id),
-                        course_image_uri=course_model.image['original'],
-                        content_ready=False,
-                        external_image_url=course_model.default_image,
-                    )
-                    import_task.queue_processed = 2
-                else:
-                    course.course_provider = import_task.course_provider
-                    course.title = course_model.title
-                    course.slug = course_model.slug
-                    course.content_db_reference = str(course_model.id)
-                    course.course_image_uri = course_model.image['original']
-                    course.content_ready = False
-                    course.external_image_url = course_model.default_image
-                    course.save()
-                    import_task.queue_processed = 2
+            try:
+                course_model = CourseModel.objects.get(external_id=data['external_id'], provider=data['provider'])
+            except CourseModel.DoesNotExist:
+                pass
+            else:
+                with scopes_disabled():
+                    try:
+                        course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
+                    except Course.DoesNotExist:
+                        course = Course.objects.create(
+                            course_provider=import_task.course_provider,
+                            title=course_model.title,
+                            slug=course_model.slug,
+                            content_db_reference=str(course_model.id),
+                            course_image_uri=course_model.image['original'],
+                            content_ready=False,
+                            external_image_url=course_model.default_image,
+                        )
+                        import_task.queue_processed = 2
+                    else:
+                        course.course_provider = import_task.course_provider
+                        course.title = course_model.title
+                        course.slug = course_model.slug
+                        course.content_db_reference = str(course_model.id)
+                        course.course_image_uri = course_model.image['original']
+                        course.content_ready = False
+                        course.external_image_url = course_model.default_image
+                        course.save()
+                        import_task.queue_processed = 2
 
-    import_task.save()
+        import_task.save()
+    finally:
+        mongo_client.disconnect_mongodb()
