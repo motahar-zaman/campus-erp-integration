@@ -4,7 +4,6 @@ from decouple import config, UndefinedValueError
 
 def save_status_to_mongo(status_data=None, collection='EnrollmentStatusHistory'):
     print('logging status to mongo')
-    return 0
     try:
         mongodb_host = config('MONGODB_HOST')
         mongodb_database = config('MONGODB_DATABASE')
