@@ -61,13 +61,13 @@ def import_courses_mongo(import_task):
                 print('upserting course document')
                 course_model.update_one(__raw__=raw_query, upsert=True)
                 print('done')
-                import_task.status = 'Success'
+                import_task.status = 'completed'
                 import_task.queue_processed = 1
                 import_task.save()
                 create_queue_postgres(import_task)
             except Exception as e:
                 print('execption: ', str(e))
-                import_task.status = 'Failed'
+                import_task.status = 'failed'
                 msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
                 save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
                 import_task.status_message = data['external_id'] + ': create error'
