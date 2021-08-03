@@ -7,6 +7,7 @@ from django_scopes import scopes_disabled
 
 class EnrollmentFormatter(object):
     def enroll(self, payload):
+        print('formatting enrollment data....')
         try:
             profile = Profile.objects.get(id=payload['profile_id'])
         except Profile.DoesNotExist:
@@ -23,6 +24,7 @@ class EnrollmentFormatter(object):
             'enrollment_id': payload['course_enrollment_id'],
             'cart_id': payload['cart_id']
         }
+        print('formatting done')
         return data
 
     def unenroll(self, payload):

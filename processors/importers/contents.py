@@ -54,57 +54,27 @@ def import_courses_mongo(import_task):
             data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
             data['_is_deleted'] = False
             try:
-                course_model = CourseModel.with_deleted_objects.get(external_id=data['external_id'], provider=data['provider'])
-            except CourseModel.DoesNotExist:
-                print('course model does not exist')
-                try:
-                    print('creating new course model')
-                    print(data)
-                    obj = CourseModel.objects(external_id=data['external_id'], provider=data['provider'])
-                    raw_query = {'$set': data}
-                    obj.update_one(__raw__=raw_query, upsert=True)
-                    # course_model = CourseModel.objects.create(**data)
-                    print('created')
-                except Exception as e:
-                    print('create failed: ', str(e))
-                    import_task.status = 'Failed'
+                print('getting course document')
+                course_model = CourseModel.with_deleted_objects(external_id=data['external_id'], provider=data['provider'])
 
-                    msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
-                    save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                raw_query = {'$set': data}
+                print('upserting course document')
+                course_model.update_one(__raw__=raw_query, upsert=True)
+                print('done')
+                import_task.status = 'Success'
+                import_task.queue_processed = 1
+                import_task.save()
+                create_queue_postgres(import_task)
+            except Exception as e:
+                print('execption: ', str(e))
+                import_task.status = 'Failed'
+                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                import_task.status_message = data['external_id'] + ': create error'
+                import_task.save()
 
-                    import_task.status_message = data['external_id'] + ': create error'
-                    import_task.save()
-                    break
-
-                else:
-                    print('create Successful')
-                    import_task.status = 'Success'
-                    import_task.queue_processed = 1
-                    import_task.save()
-                    create_queue_postgres(import_task)
-            else:
-                print('course model exists')
-                try:
-                    print('updating course model')
-                    course_model.update(**data)
-                except Exception as e:
-                    print('update failed: ', str(e))
-                    import_task.status = 'Failed'
-
-                    msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
-                    save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
-
-                    import_task.status_message = data['external_id'] + ': update error'
-                    import_task.save()
-                    break
-
-                else:
-                    print('update Successful')
-                    import_task.status = 'Success'
-                    import_task.queue_processed = 1
-                    import_task.save()
-                    create_queue_postgres(import_task)
     finally:
+        print('operation completed')
         mongo_client.disconnect_mongodb()
 
 
@@ -137,15 +107,19 @@ def import_courses_postgres(import_task):
                     try:
                         course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
                     except Course.DoesNotExist:
-                        course = Course.objects.create(
-                            course_provider=import_task.course_provider,
-                            title=course_model.title,
-                            slug=course_model.slug,
-                            content_db_reference=str(course_model.id),
-                            course_image_uri=course_model.image['original'],
-                            content_ready=False,
-                            external_image_url=course_model.default_image,
-                        )
+                        try:
+                            course = Course.objects.create(
+                                course_provider=import_task.course_provider,
+                                title=course_model.title,
+                                slug=course_model.slug,
+                                content_db_reference=str(course_model.id),
+                                course_image_uri=course_model.image['original'],
+                                content_ready=False,
+                                external_image_url=course_model.default_image,
+                            )
+                        except Exception as e:
+                            msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': data['external_id']}
+                            save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
                         import_task.queue_processed = 2
                     else:
                         course.course_provider = import_task.course_provider
