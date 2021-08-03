@@ -23,7 +23,9 @@ configs = {
 
 
 def enroll(message_data):
+    print('attempting enrollment')
     if message_data['enrollment_type'] == 'course':
+        print('enrollment type is course')
         enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
         enrollment.status = CourseEnrollment.STATUS_PENDING
 
@@ -32,17 +34,21 @@ def enroll(message_data):
         enrollment.status = CertificateEnrollment.STATUS_PENDING
 
     try:
+        print('getting erp data')
         erp = message_data['erp']
         profile = message_data['profile']
         data = message_data['data']
         action = message_data['action']
     except KeyError:
+        print('could not get erp data')
         save_status_to_mongo(status_data={'comment': 'unknown data format'})
         return 1
 
     try:
+        print('getting erp config')
         erp_config = configs[erp]
     except KeyError:
+        print('could not get erp config')
         save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
         return 1
 
@@ -51,7 +57,9 @@ def enroll(message_data):
 
     processor_obj = processor_class(credentials, profile, data)
 
+    print('authenticating erp')
     if not processor_obj.authenticate():
+        print('authentication erp failed')
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
             enrollment.status = CourseEnrollment.STATUS_FAILED
@@ -65,10 +73,13 @@ def enroll(message_data):
         save_status_to_mongo(status_data=status_data)
         return 0
 
+    print('erp authentication successful')
     status_data = {'comment': 'erp_authenticated', 'data': credentials}
     save_status_to_mongo(status_data=status_data)
     action = getattr(processor_obj, action)
+    print('Enrolling...')
     resp = action()
+    print('enrollment response: ', resp)
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
         status_data = {'comment': 'failed', 'data': resp}
@@ -96,6 +107,7 @@ def enroll(message_data):
             pass
 
         if already_enrolled:
+            print('this course was already enrolled')
             # lms says this course was already enrolled to.
             # so there must be another entry in the CourseEnrollment table with the same course for the same profile.
             try:
@@ -121,10 +133,13 @@ def enroll(message_data):
             }
         )
     else:
+        print('enrollment successful')
         enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
         enrollment.status = CertificateEnrollment.STATUS_SUCCESS
 
+    print('saving enrollment')
     enrollment.save()
+    print('done')
 
 
 def unenroll(data):

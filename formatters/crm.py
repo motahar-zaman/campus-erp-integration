@@ -1,3 +1,4 @@
+from config.mongo_client import connect_mongodb, disconnect_mongodb
 from django_initializer import initialize_django
 initialize_django()
 
@@ -15,39 +16,43 @@ def get_details(product):
     course_provider = ''
 
     try:
-        with scopes_disabled():
-            store_course_section = StoreCourseSection.objects.get(product=product)
-        product_type = 'Course'
-        product_name = store_course_section.store_course.course.title
-        course_provider = store_course_section.store_course.course.course_provider.name
-
-    except StoreCourseSection.DoesNotExist:
-        pass
-    else:
-        start_date = None
-        end_date = None
-        execution_mode = None
-
+        connect_mongodb()
         try:
-            course_model = CourseModel.objects.get(id=store_course_section.store_course.course.content_db_reference)
-            for section in course_model.sections:
-                if section.code == store_course_section.section.name:
-                    start_date = section.start_date
-                    end_date = section.end_date
-                    execution_mode = section.execution_mode
-                    break
+            with scopes_disabled():
+                store_course_section = StoreCourseSection.objects.get(product=product)
+            product_type = 'Course'
+            product_name = store_course_section.store_course.course.title
+            course_provider = store_course_section.store_course.course.course_provider.name
 
-            section_details = {'name': store_course_section.section.name, 'start_date': str(start_date), 'end_date': str(end_date), 'execution_mode': execution_mode}
-        except CourseModel.DoesNotExist:
+        except StoreCourseSection.DoesNotExist:
             pass
-    try:
-        with scopes_disabled():
-            store_certificate = StoreCertificate.objects.get(product=product)
-        product_type = 'Certificate'
-        product_name = store_certificate.certificate.title
-        course_provider = store_certificate.certificate.course_provider.name
-    except StoreCertificate.DoesNotExist:
-        pass
+        else:
+            start_date = None
+            end_date = None
+            execution_mode = None
+
+            try:
+                course_model = CourseModel.objects.get(id=store_course_section.store_course.course.content_db_reference)
+                for section in course_model.sections:
+                    if section.code == store_course_section.section.name:
+                        start_date = section.start_date
+                        end_date = section.end_date
+                        execution_mode = section.execution_mode
+                        break
+
+                section_details = {'name': store_course_section.section.name, 'start_date': str(start_date), 'end_date': str(end_date), 'execution_mode': execution_mode}
+            except CourseModel.DoesNotExist:
+                pass
+        try:
+            with scopes_disabled():
+                store_certificate = StoreCertificate.objects.get(product=product)
+            product_type = 'Certificate'
+            product_name = store_certificate.certificate.title
+            course_provider = store_certificate.certificate.course_provider.name
+        except StoreCertificate.DoesNotExist:
+            pass
+    finally:
+        disconnect_mongodb()
 
     return {'section': section_details, 'product_type': product_type, 'product_name': product_name, 'course_provider': course_provider}
 
