@@ -9,9 +9,10 @@ from config import mongo_client
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import Course
+from shared_models.models import Course, Section
 from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
+from models.course.section import Section as SectionModel
 
 
 def create_queue_postgres(import_task):
@@ -25,7 +26,13 @@ def create_queue_postgres(import_task):
     connection = pika.BlockingConnection(pika.URLParameters(amqp_url))
     channel = connection.channel()
     channel.exchange_declare(exchange='campusmq', exchange_type='topic')
-    channel.basic_publish(exchange='campusmq', routing_key='course_postgres.import', body=json.dumps({'import_task_id': str(import_task.id)}))
+
+    if import_task.import_type == 'course':
+        routing_key = 'course_postgres.import'
+    if import_task.import_type == 'section':
+        routing_key = 'section_postgres.import'
+
+    channel.basic_publish(exchange='campusmq', routing_key=routing_key, body=json.dumps({'import_task_id': str(import_task.id)}))
     print('Published data to MQ, closing connection')
     connection.close()
     print('Done')
@@ -130,6 +137,116 @@ def import_courses_postgres(import_task):
                         course.content_ready = False
                         course.external_image_url = course_model.default_image
                         course.save()
+                        import_task.queue_processed = 2
+
+        import_task.save()
+    finally:
+        mongo_client.disconnect_mongodb()
+
+
+def import_sections_mongo(import_task):
+    filename = import_task.filename.name
+    remote_url = 'https://static.dev.campus.com/uploads/'
+    file_url = f'{remote_url}{filename}'
+
+    response = urllib.request.urlopen(file_url)
+    lines = [line.decode('utf-8') for line in response.readlines()]
+    cr = csv.DictReader(lines)
+    items = list(cr)
+
+    try:
+        mongo_client.connect_mongodb()
+        for data in items:
+            data = {k.strip().replace('*', ''): v.strip() for (k, v) in data.items()}
+            try:
+                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
+            except CourseModel.DoesNotExist:
+                import_task.queue_processed = 2
+                import_task.status = 'failed'
+            else:
+
+                data['course_fee'] = {'amount': data['course_fee'], 'currency': 'usd'}
+                data['instructors'] = []
+                if data['details_url'] == '':
+                    data['details_url'] = None
+
+                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
+
+                if CourseModel.objects(id=course_model.id, sections__code=data['code']).count():
+                    print('exists.updating')
+                    CourseModel.objects(
+                        id=course_model.id, sections__code=data['code']
+                    ).update_one(set__sections__S=SectionModel(**data))
+                else:
+                    print('does not exists. creating')
+                    course_model.sections.append(SectionModel(**data))
+                    course_model.save()
+
+                import_task.queue_processed = 2
+
+        import_task.save()
+    finally:
+        mongo_client.disconnect_mongodb()
+    create_queue_postgres(import_task)
+
+
+def import_sections_postgres(import_task):
+    filename = import_task.filename.name
+    remote_url = 'https://static.dev.campus.com/uploads/'
+    file_url = f'{remote_url}{filename}'
+
+    response = urllib.request.urlopen(file_url)
+    lines = [line.decode('utf-8') for line in response.readlines()]
+    cr = csv.DictReader(lines)
+    items = list(cr)
+
+    try:
+        mongo_client.connect_mongodb()
+        for data in items:
+            data = {k.strip().replace('*', ''): v.strip() for (k, v) in data.items()}
+            data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+
+            try:
+                course_model = CourseModel.objects.get(id=data['course'], provider=data['provider'])
+            except CourseModel.DoesNotExist:
+                pass
+            else:
+                with scopes_disabled():
+                    try:
+                        course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
+                    except Course.DoesNotExist:
+                        pass
+                    else:
+                        try:
+                            section = Section.objects.get(course=course, name=data['code'])
+                        except Section.DoesNotExist:
+                            Section.objects.create(
+                                course=course,
+                                name=data['code'],
+                                fee=data['course_fee'],
+                                seat_capacity=data['num_seats'],
+                                available_seat=data['available_seats'],
+                                execution_mode=data['execution_mode'],
+                                registration_deadline=data['registration_deadline'],
+                                content_db_reference=str(course_model.id),
+                                is_active=False,
+                                start_date=data['start_date'],
+                                end_date=data['end_date'],
+                                execution_site=data['execution_site'],
+                            )
+                        else:
+                            section.name = data['code']
+                            section.fee = data['course_fee']
+                            section.seat_capacity = data['num_seats']
+                            section.available_seat = data['available_seats']
+                            section.execution_mode = data['execution_mode']
+                            section.registration_deadline = data['registration_deadline']
+                            section.content_db_reference = str(course_model.id)
+                            section.is_active = False
+                            section.start_date = data['start_date']
+                            section.end_date = data['end_date']
+                            section.execution_site = data['execution_site']
+
                         import_task.queue_processed = 2
 
         import_task.save()
