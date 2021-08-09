@@ -96,6 +96,5 @@ def import_callback(ch, method, properties, body):
         print('* Importing section to mongo')
         formatter = ImportFormatter()
         import_task = formatter.section(payload)
-        print('>>>>>>>>>>>>>>>> ', import_task)
         import_sections_mongo(import_task)
         print('Done')
