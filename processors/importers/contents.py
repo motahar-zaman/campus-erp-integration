@@ -12,6 +12,7 @@ initialize_django()
 from shared_models.models import Course
 from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
+from models.course.section import Section as SectionModel
 
 
 def create_queue_postgres(import_task):
@@ -131,6 +132,51 @@ def import_courses_postgres(import_task):
                         course.external_image_url = course_model.default_image
                         course.save()
                         import_task.queue_processed = 2
+
+        import_task.save()
+    finally:
+        mongo_client.disconnect_mongodb()
+
+
+def import_sections_mongo(import_task):
+    filename = import_task.filename.name
+    remote_url = 'https://static.dev.campus.com/uploads/'
+    file_url = f'{remote_url}{filename}'
+
+    response = urllib.request.urlopen(file_url)
+    lines = [line.decode('utf-8') for line in response.readlines()]
+    cr = csv.DictReader(lines)
+    items = list(cr)
+
+    try:
+        mongo_client.connect_mongodb()
+        for data in items:
+            data = {k.strip().replace('*', ''): v.strip() for (k, v) in data.items()}
+            try:
+                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
+            except CourseModel.DoesNotExist:
+                import_task.queue_processed = 2
+                import_task.status = 'failed'
+            else:
+
+                data['course_fee'] = {'amount': data['course_fee'], 'currency': 'usd'}
+                data['instructors'] = []
+                if data['details_url'] == '':
+                    data['details_url'] = None
+
+                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
+
+                if CourseModel.objects(id=course_model.id, sections__code=data['code']).count():
+                    print('exists.updating')
+                    CourseModel.objects(
+                        id=course_model.id, sections__code=data['code']
+                    ).update_one(set__sections__S=SectionModel(**data))
+                else:
+                    print('does not exists. creating')
+                    course_model.sections.append(SectionModel(**data))
+                    course_model.save()
+
+                import_task.queue_processed = 2
 
         import_task.save()
     finally:

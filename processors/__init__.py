@@ -8,7 +8,7 @@ from formatters.importers import ImportFormatter
 from processors.enrollment.mindedge import enroll, unenroll
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
-from processors.importers.contents import import_courses_mongo, import_courses_postgres
+from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo
 
 from loggers.elastic_search import upload_log
 
@@ -90,4 +90,12 @@ def import_callback(ch, method, properties, body):
         formatter = ImportFormatter()
         import_task = formatter.course(payload)
         import_courses_postgres(import_task)
+        print('Done')
+
+    if 'section_mongo' in method.routing_key:
+        print('* Importing section to mongo')
+        formatter = ImportFormatter()
+        import_task = formatter.section(payload)
+        print('>>>>>>>>>>>>>>>> ', import_task)
+        import_sections_mongo(import_task)
         print('Done')

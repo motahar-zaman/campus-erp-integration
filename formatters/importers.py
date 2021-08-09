@@ -13,3 +13,11 @@ class ImportFormatter(object):
             except ImportTask.DoesNotExist:
                 return {}
         return import_task
+
+    def section(self, payload):
+        with scopes_disabled():
+            try:
+                import_task = ImportTask.objects.get(id=payload['import_task_id'])
+            except ImportTask.DoesNotExist:
+                return {}
+        return import_task
