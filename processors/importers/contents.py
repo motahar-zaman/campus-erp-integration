@@ -7,6 +7,8 @@ import urllib.request
 from loggers.mongo import save_status_to_mongo
 from config import mongo_client
 from django_initializer import initialize_django
+from datetime import datetime
+from django.utils.formats import get_format
 initialize_django()
 
 from shared_models.models import Course, Section
@@ -158,19 +160,54 @@ def import_sections_mongo(import_task):
         mongo_client.connect_mongodb()
         for data in items:
             data = {k.strip().replace('*', ''): v.strip() for (k, v) in data.items()}
+
+            data['course_fee'] = {'amount': data['course_fee'], 'currency': 'usd'}
+            data['instructors'] = []
             try:
-                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
+                int(data['num_seats'])
+            except ValueError:
+                data['num_seats'] = 0
+
+            try:
+                int(data['available_seats'])
+            except ValueError:
+                data['available_seats'] = 0
+
+            try:
+                float(data['credit_hours'])
+            except ValueError:
+                data['credit_hours'] = 0.00
+
+            try:
+                float(data['ceu_hours'])
+            except ValueError:
+                data['ceu_hours'] = 0.00
+
+            try:
+                float(data['clock_hours'])
+            except ValueError:
+                data['clock_hours'] = 0.00
+
+            if data['registration_deadline'] == '':
+                data['registration_deadline'] = datetime.now().date()
+
+            try:
+                float(data['load_hours'])
+            except ValueError:
+                data['load_hours'] = 0.00
+
+            if data['details_url'] == '':
+                data['details_url'] = None
+
+            data['execution_mode'] = str(data['execution_mode']).lower()
+
+            data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+            try:
+                course_model = CourseModel.with_deleted_objects.get(external_id=data.pop('course_external_id'), provider=data.pop('provider'))
             except CourseModel.DoesNotExist:
                 import_task.queue_processed = 2
                 import_task.status = 'failed'
             else:
-
-                data['course_fee'] = {'amount': data['course_fee'], 'currency': 'usd'}
-                data['instructors'] = []
-                if data['details_url'] == '':
-                    data['details_url'] = None
-
-                course_model = CourseModel.objects.get(id=ObjectId(data.pop('course')))
 
                 if CourseModel.objects(id=course_model.id, sections__code=data['code']).count():
                     print('exists.updating')
@@ -190,6 +227,18 @@ def import_sections_mongo(import_task):
     create_queue_postgres(import_task)
 
 
+def parse_date(date_str):
+    """Parse date from string by DATE_INPUT_FORMATS of current language"""
+    for item in get_format('DATE_INPUT_FORMATS'):
+        try:
+            date = datetime.strptime(date_str, item).date()
+            datetime.combine(date, datetime.max.time())
+        except (ValueError, TypeError):
+            continue
+
+    return None
+
+
 def import_sections_postgres(import_task):
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus.com/uploads/'
@@ -204,10 +253,15 @@ def import_sections_postgres(import_task):
         mongo_client.connect_mongodb()
         for data in items:
             data = {k.strip().replace('*', ''): v.strip() for (k, v) in data.items()}
+            if data['available_seats'] == '':
+                data['available_seats'] = None
+
+            if data['num_seats'] == '':
+                data['num_seats'] = None
             data['provider'] = ObjectId(import_task.course_provider.content_db_reference)
 
             try:
-                course_model = CourseModel.objects.get(id=data['course'], provider=data['provider'])
+                course_model = CourseModel.with_deleted_objects.get(external_id=data.pop('course_external_id'), provider=data.pop('provider'))
             except CourseModel.DoesNotExist:
                 pass
             else:
@@ -227,11 +281,11 @@ def import_sections_postgres(import_task):
                                 seat_capacity=data['num_seats'],
                                 available_seat=data['available_seats'],
                                 execution_mode=data['execution_mode'],
-                                registration_deadline=data['registration_deadline'],
+                                registration_deadline=parse_date(data['registration_deadline']),
                                 content_db_reference=str(course_model.id),
                                 is_active=False,
-                                start_date=data['start_date'],
-                                end_date=data['end_date'],
+                                start_date=parse_date(data['start_date']),
+                                end_date=parse_date(data['end_date']),
                                 execution_site=data['execution_site'],
                             )
                         else:
