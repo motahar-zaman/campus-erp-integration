@@ -64,7 +64,7 @@ def import_courses_mongo(import_task):
         mongo_client.connect_mongodb()
         is_success = True
         for key, row in data.items():
-            row = {k.strip(): str(v).strip() for (k, v) in row.items()}
+            row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
             row['image'] = {'original': row['image']}
             row['default_image'] = {'original': row['default_image']}
             row['from_importer'] = True
