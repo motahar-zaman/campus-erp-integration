@@ -106,12 +106,11 @@ def import_courses_mongo(import_task):
                 for course_external_id, data in groupby(career_data, key=lambda x:x['course_external_id']):
                     soc_codes = [item['soc_code'] for item in list(data)]
                     print('updating course with career data: ', course_external_id, soc_codes)
-                    course_model = CourseModel.objects.get(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
-                    course_model.update(
+                    course_model = CourseModel.with_deleted_objects(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
+                    course_model.update_one(
                         pull_all__careers=[item for item in OccupationModel.objects.all()]
                     )
-                    course_model.update(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
-                    course_model.save()
+                    course_model.update_one(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
                     print('career tagging complete')
 
     finally:
