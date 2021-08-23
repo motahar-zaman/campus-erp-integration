@@ -18,7 +18,10 @@ from shared_models.models import Course, Section
 from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
+from models.course.section_schedule import SectionSchedule
 from models.occupation.occupation import Occupation as OccupationModel
+from models.courseprovider.provider_site import CourseProviderSite
+from models.courseprovider.instructor import Instructor
 
 
 def create_queue_postgres(import_task):
@@ -98,17 +101,16 @@ def import_courses_mongo(import_task):
                 career_data = []
 
                 for key, row in df2.T.to_dict().items():
-                    career_data.append({k.strip(): str(v).strip() for (k, v) in row.items()})
+                    career_data.append({k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()})
 
                 for course_external_id, data in groupby(career_data, key=lambda x:x['course_external_id']):
                     soc_codes = [item['soc_code'] for item in list(data)]
                     print('updating course with career data: ', course_external_id, soc_codes)
-                    course_model = CourseModel.objects.get(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
-                    course_model.update(
+                    course_model = CourseModel.with_deleted_objects(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
+                    course_model.update_one(
                         pull_all__careers=[item for item in OccupationModel.objects.all()]
                     )
-                    course_model.update(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
-                    course_model.save()
+                    course_model.update_one(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
                     print('career tagging complete')
 
     finally:
@@ -174,6 +176,29 @@ def import_courses_postgres(import_task):
     finally:
         mongo_client.disconnect_mongodb()
 
+def get_section_schedules(import_task, row, schedules):
+    try:
+        schedules = schedules[row['code']]
+    except KeyError:
+        return []
+
+    return [SectionSchedule(**item) for item in schedules]
+
+def get_section_instructors(import_task, row, instructors):
+    try:
+        instructors = instructors[row['code']]
+    except KeyError:
+        return []
+    ins = []
+    for item in instructors:
+        item['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+        item['profile_urls'] = {'url': item['profile_urls']}
+        item['image'] = {'default': item['image']}
+        obj = Instructor.objects.filter(**item).first()
+        if not obj:
+            obj = Instructor.objects.create(**item)
+        ins.append(obj)
+    return ins
 
 def import_sections_mongo(import_task):
     filename = import_task.filename.name
@@ -181,16 +206,65 @@ def import_sections_mongo(import_task):
     file_url = f'{remote_url}{filename}'
 
     response = urllib.request.urlopen(file_url)
-    df = pd.read_excel(response.read())
+    resp_binary = response.read()
+    df = pd.read_excel(resp_binary, sheet_name=import_task.import_type)
     data = df.T.to_dict()
 
     try:
         mongo_client.connect_mongodb()
+        # fix schedules data
+        schedules_data = []
+        schedules = {}
+        try:
+            schedules_df = pd.read_excel(resp_binary, 'schedules')
+        except ValueError:
+            pass
+        else:
+            for key, row in schedules_df.T.to_dict().items():
+                schedules_data.append({k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()})
+            for section_code, lst in groupby(schedules_data, key=lambda x:x['section_code']):
+                sch_list = []
+                for item in list(lst):
+                    del item['section_code']
+                    sch_list.append(item)
+                schedules[section_code] = sch_list
+
+        # fix instructor data
+        instructors_data = []
+        instructors = {}
+        try:
+            instructors_df = pd.read_excel(resp_binary, 'instructors')
+        except ValueError:
+            pass
+        else:
+            for key, row in instructors_df.T.to_dict().items():
+                instructors_data.append({k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()})
+            for section_code, lst in groupby(instructors_data, key=lambda x:x['section_code']):
+                ins_list = []
+                for item in list(lst):
+                    del item['section_code']
+                    ins_list.append(item)
+                instructors[section_code] = ins_list
+        # instructor and schedules data done
+
         for key, row in data.items():
             row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
 
             row['course_fee'] = {'amount': row['course_fee'], 'currency': 'usd'}
-            row['instructors'] = []
+            # checking if execution site is present with the provided value. we search with both name and code. if none is found, we create one.
+            execution_site = CourseProviderSite.objects.filter(code=row['execution_site'], provider=ObjectId(import_task.course_provider.content_db_reference)).first()
+
+            if not execution_site:
+                execution_site = CourseProviderSite.objects.filter(name=row['execution_site'], provider=ObjectId(import_task.course_provider.content_db_reference)).first()
+
+            if not execution_site:
+                execution_site = CourseProviderSite.objects.create(
+                    name=row['execution_site'],
+                    code=row['execution_site'],
+                    provider=ObjectId(import_task.course_provider.content_db_reference)
+                )
+            # execution site done
+
             try:
                 int(row['num_seats'])
             except ValueError:
@@ -228,8 +302,13 @@ def import_sections_mongo(import_task):
                 row['details_url'] = None
 
             row['execution_mode'] = str(row['execution_mode']).lower()
+            row['execution_site'] = execution_site
 
             row['provider'] = ObjectId(import_task.course_provider.content_db_reference)
+
+            row['schedules'] = get_section_schedules(import_task, row, schedules)
+            row['instructors'] = get_section_instructors(import_task, row, instructors)
+
             try:
                 course_model = CourseModel.with_deleted_objects.get(external_id=row.pop('course_external_id'), provider=row.pop('provider'))
             except CourseModel.DoesNotExist:
@@ -248,7 +327,6 @@ def import_sections_mongo(import_task):
                     course_model.save()
 
                 import_task.queue_processed = 2
-
         import_task.save()
     finally:
         mongo_client.disconnect_mongodb()
@@ -308,7 +386,7 @@ def import_sections_postgres(import_task):
                                 seat_capacity=row['num_seats'],
                                 available_seat=row['available_seats'],
                                 execution_mode=row['execution_mode'],
-                                registration_deadline=parse_date(data['registration_deadline']),
+                                registration_deadline=parse_date(row['registration_deadline']),
                                 content_db_reference=str(course_model.id),
                                 is_active=False,
                                 start_date=parse_date(row['start_date']),
