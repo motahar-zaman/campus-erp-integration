@@ -323,10 +323,13 @@ def import_sections_mongo(import_task):
                     CourseModel.objects(
                         id=course_model.id, sections__code=row['code']
                     ).update_one(set__sections__S=SectionModel(**row))
+
+                    print('section updated')
                 else:
                     print('section does not exists. creating')
                     course_model.sections.append(SectionModel(**row))
                     course_model.save()
+                    print('new section added to the course')
 
                 import_task.queue_processed = 2
         import_task.save()
@@ -334,6 +337,8 @@ def import_sections_mongo(import_task):
         print('could not connect to mongodb')
     finally:
         mongo_client.disconnect_mongodb()
+    
+    print('queueing postgres task for importing sections')
     create_queue_postgres(import_task)
 
 
@@ -350,15 +355,18 @@ def parse_date(date_str):
 
 
 def import_sections_postgres(import_task):
+    print('---------------------------------------------')
+    print('section import into postgres started')
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus.com/uploads/'
     file_url = f'{remote_url}{filename}'
-
+    print('got valuable variables')
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
-
+    print('got dataframe')
     try:
         mongo_client.connect_mongodb()
+        print('connected to mongodb')
         for key, row in data.items():
             row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
             if row['available_seats'] == '':
@@ -371,14 +379,18 @@ def import_sections_postgres(import_task):
             try:
                 course_model = CourseModel.with_deleted_objects.get(external_id=row.pop('course_external_id'), provider=row.pop('provider'))
             except CourseModel.DoesNotExist:
-                pass
+                import_task.queue_processed = 2
+                import_task.status = 'failed'
             else:
+                print('got course model')
                 with scopes_disabled():
                     try:
                         course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
                     except Course.DoesNotExist:
-                        pass
+                        import_task.queue_processed = 2
+                        import_task.status = 'failed'
                     else:
+                        print('got course object')
                         try:
                             section = Section.objects.get(course=course, name=row['code'])
                         except Section.DoesNotExist:
@@ -396,6 +408,7 @@ def import_sections_postgres(import_task):
                                 end_date=parse_date(row['end_date']),
                                 execution_site=row['execution_site'],
                             )
+                            print('created new section')
                         else:
                             section.name = row['code']
                             section.fee = row['course_fee']
@@ -408,8 +421,11 @@ def import_sections_postgres(import_task):
                             section.start_date = row['start_date']
                             section.end_date = row['end_date']
                             section.execution_site = row['execution_site']
+                            section.save()
+                            print('updated section')
 
                         import_task.queue_processed = 2
+                        import_task.status = 'completed'
 
         import_task.save()
     finally:
