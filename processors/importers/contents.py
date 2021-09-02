@@ -52,10 +52,8 @@ def import_courses_mongo(import_task):
     remote_url = 'https://static.dev.campus.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
-    response = urllib.request.urlopen(file_url)
-    resp_binary = response.read()
     try:
-        df = pd.read_excel(resp_binary, sheet_name=import_task.import_type)
+        df = pd.read_excel(file_url, sheet_name=import_task.import_type, na_values=str, keep_default_na=False)
     except ValueError:
         print('could not retrieve data. possibly wrong file type.')
         return
@@ -92,26 +90,26 @@ def import_courses_mongo(import_task):
                 import_task.status_message = row['external_id'] + ': create error'
                 import_task.save()
 
-            try:
-                df2 = pd.read_excel(resp_binary, sheet_name='careers')
-            except ValueError:
-                pass
-            else:
-                print('got career tagging data')
-                career_data = []
+        try:
+            df2 = pd.read_excel(file_url, sheet_name='careers', na_values=str, keep_default_na=False)
+        except ValueError:
+            pass
+        else:
+            print('got career tagging data')
+            career_data = []
 
-                for key, row in df2.T.to_dict().items():
-                    career_data.append({k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()})
+            for key, row in df2.T.to_dict().items():
+                career_data.append({k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()})
 
-                for course_external_id, data in groupby(career_data, key=lambda x:x['course_external_id']):
-                    soc_codes = [item['soc_code'] for item in list(data)]
-                    print('updating course with career data: ', course_external_id, soc_codes)
-                    course_model = CourseModel.with_deleted_objects(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
-                    course_model.update_one(
-                        pull_all__careers=[item for item in OccupationModel.objects.all()]
-                    )
-                    course_model.update_one(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
-                    print('career tagging complete')
+            for course_external_id, data in groupby(career_data, key=lambda x:x['course_external_id']):
+                soc_codes = [item['soc_code'] for item in list(data)]
+                print('updating course with career data: ', course_external_id, soc_codes)
+                course_model = CourseModel.with_deleted_objects(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
+                course_model.update_one(
+                    pull_all__careers=[item for item in OccupationModel.objects.all()]
+                )
+                course_model.update_one(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
+                print('career tagging complete')
 
     finally:
         if is_success:
@@ -129,8 +127,7 @@ def import_courses_postgres(import_task):
     remote_url = 'https://static.dev.campus.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
-    response = urllib.request.urlopen(file_url)
-    df = pd.read_excel(response.read())
+    df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
 
     try:
@@ -201,22 +198,25 @@ def get_section_instructors(import_task, row, instructors):
     return ins
 
 def import_sections_mongo(import_task):
+    print('begin...')
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
-    response = urllib.request.urlopen(file_url)
-    resp_binary = response.read()
-    df = pd.read_excel(resp_binary, sheet_name=import_task.import_type)
+    print('got valuable variables')
+    df = pd.read_excel(file_url, sheet_name=import_task.import_type, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
 
+    print('got data and converted to dataframe')
+
     try:
+        print('trying to connect to mongodb')
         mongo_client.connect_mongodb()
-        # fix schedules data
+        print('mongodb connected.')
         schedules_data = []
         schedules = {}
         try:
-            schedules_df = pd.read_excel(resp_binary, 'schedules')
+            schedules_df = pd.read_excel(file_url, 'schedules')
         except ValueError:
             pass
         else:
@@ -229,11 +229,11 @@ def import_sections_mongo(import_task):
                     sch_list.append(item)
                 schedules[section_code] = sch_list
 
-        # fix instructor data
+        print('got schedules data: ', schedules)
         instructors_data = []
         instructors = {}
         try:
-            instructors_df = pd.read_excel(resp_binary, 'instructors')
+            instructors_df = pd.read_excel(file_url, 'instructors', na_values=str, keep_default_na=False)
         except ValueError:
             pass
         else:
@@ -246,7 +246,7 @@ def import_sections_mongo(import_task):
                     ins_list.append(item)
                 instructors[section_code] = ins_list
         # instructor and schedules data done
-
+        print('got instructors: ', instructors)
         for key, row in data.items():
             row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
 
@@ -306,8 +306,10 @@ def import_sections_mongo(import_task):
 
             row['provider'] = ObjectId(import_task.course_provider.content_db_reference)
 
+            print('row so far: ', row)
             row['schedules'] = get_section_schedules(import_task, row, schedules)
             row['instructors'] = get_section_instructors(import_task, row, instructors)
+            print('added schedules and instructors to row')
 
             try:
                 course_model = CourseModel.with_deleted_objects.get(external_id=row.pop('course_external_id'), provider=row.pop('provider'))
@@ -315,19 +317,21 @@ def import_sections_mongo(import_task):
                 import_task.queue_processed = 2
                 import_task.status = 'failed'
             else:
-
+                print('course model found')
                 if CourseModel.objects(id=course_model.id, sections__code=row['code']).count():
-                    print('exists.updating')
+                    print('section exists. updating')
                     CourseModel.objects(
                         id=course_model.id, sections__code=row['code']
                     ).update_one(set__sections__S=SectionModel(**row))
                 else:
-                    print('does not exists. creating')
+                    print('section does not exists. creating')
                     course_model.sections.append(SectionModel(**row))
                     course_model.save()
 
                 import_task.queue_processed = 2
         import_task.save()
+    except:
+        print('could not connect to mongodb')
     finally:
         mongo_client.disconnect_mongodb()
     create_queue_postgres(import_task)
@@ -350,8 +354,7 @@ def import_sections_postgres(import_task):
     remote_url = 'https://static.dev.campus.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
-    response = urllib.request.urlopen(file_url)
-    df = pd.read_excel(response.read())
+    df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
 
     try:
