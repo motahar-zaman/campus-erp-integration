@@ -327,8 +327,7 @@ def import_sections_mongo(import_task):
                     print('section updated')
                 else:
                     print('section does not exists. creating')
-                    course_model.sections.append(SectionModel(**row))
-                    course_model.save()
+                    CourseModel.objects(id=course_model.id).update_one(push__sections=SectionModel(**row))
                     print('new section added to the course')
 
                 import_task.queue_processed = 2
