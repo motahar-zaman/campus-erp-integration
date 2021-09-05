@@ -1,7 +1,7 @@
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile
+from shared_models.models import Payment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
 from django_scopes import scopes_disabled
 
 
@@ -11,6 +11,16 @@ class EnrollmentFormatter(object):
         try:
             profile = Profile.objects.get(id=payload['profile_id'])
         except Profile.DoesNotExist:
+            return {}
+        
+        try:
+            payment = Payment.objects.get(id=payload['payment_id'])
+        except Payment.DoesNotExist:
+            return {}
+        
+        try:
+            store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
+        except StorePaymentGateway.DoesNotExist:
             return {}
 
         data = {
@@ -22,7 +32,9 @@ class EnrollmentFormatter(object):
             'action': 'enroll',
             'enrollment_type': 'course',
             'enrollment_id': payload['course_enrollment_id'],
-            'cart_id': payload['cart_id']
+            'cart_id': payload['cart_id'],
+            'payment': payment,
+            'store_payment_gateway': store_payment_gateway
         }
         print('formatting done')
         return data

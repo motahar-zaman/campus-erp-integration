@@ -3,6 +3,7 @@ from services.mindedge import MindEdgeService
 from decouple import config
 from loggers.mongo import save_status_to_mongo
 from django_scopes import scopes_disabled
+from .payment_capture import capture_payment
 from django_initializer import initialize_django
 initialize_django()
 
@@ -39,6 +40,8 @@ def enroll(message_data):
         profile = message_data['profile']
         data = message_data['data']
         action = message_data['action']
+        payment = message_data.pop('payment')
+        store_payment_gateway = message_data.pop('store_payment_gateway')
     except KeyError:
         print('could not get erp data')
         save_status_to_mongo(status_data={'comment': 'unknown data format'})
@@ -132,6 +135,10 @@ def enroll(message_data):
                 'lms_access_details': resp,
             }
         )
+        #########################################
+        # initiate payment capture              #
+        #########################################
+        capture_payment(payment, store_payment_gateway)
     else:
         print('enrollment successful')
         enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
