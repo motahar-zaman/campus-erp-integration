@@ -13,15 +13,16 @@ class EnrollmentFormatter(object):
         except Profile.DoesNotExist:
             return {}
         
-        try:
-            payment = Payment.objects.get(id=payload['payment_id'])
-        except Payment.DoesNotExist:
-            return {}
-        
-        try:
-            store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
-        except StorePaymentGateway.DoesNotExist:
-            return {}
+        with scopes_disabled():
+            try:
+                payment = Payment.objects.get(id=payload['payment_id'])
+            except Payment.DoesNotExist:
+                return {}
+            
+            try:
+                store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
+            except StorePaymentGateway.DoesNotExist:
+                return {}
 
         data = {
             'data': {
