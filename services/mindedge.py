@@ -48,6 +48,7 @@ class MindEdgeService():
             payload['sid'] = self.data['sid']
         
         print('enrollment payload: ', payload)
+        print('enrollment header: ', self.auth_header)
 
         response = requests.post(self.url, json=payload, headers=self.auth_header)
 

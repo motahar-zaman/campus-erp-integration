@@ -82,7 +82,6 @@ def enroll(message_data):
     action = getattr(processor_obj, action)
     print('Enrolling...')
     resp = action()
-    print('enrollment response: ', resp)
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
         status_data = {'comment': 'failed', 'data': resp}
