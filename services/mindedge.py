@@ -21,6 +21,7 @@ class MindEdgeService():
 
     def authenticate(self):
         payload = {'username': self.username, 'password': self.password, 'token': self.token}
+        print('auth payload: ', payload)
         response = requests.post(self.url, json=payload)
         resp = response.json()
 

@@ -37,7 +37,7 @@ class EnrollmentFormatter(object):
             'payment': payment,
             'store_payment_gateway': store_payment_gateway
         }
-        print('formatting done')
+        print('formatting done: ', data)
         return data
 
     def unenroll(self, payload):
