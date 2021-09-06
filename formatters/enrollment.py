@@ -18,7 +18,7 @@ class EnrollmentFormatter(object):
                 payment = Payment.objects.get(id=payload['payment_id'])
             except Payment.DoesNotExist:
                 return {}
-            
+
             try:
                 store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
             except StorePaymentGateway.DoesNotExist:

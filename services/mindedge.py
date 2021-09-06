@@ -21,9 +21,10 @@ class MindEdgeService():
 
     def authenticate(self):
         payload = {'username': self.username, 'password': self.password, 'token': self.token}
-        print('auth payload: ', payload)
+        print('authentication paylaod: ', payload)
         response = requests.post(self.url, json=payload)
         resp = response.json()
+        print('authentication response: ', resp)
 
         if resp['status'] == 'success':
             self.auth_header = {'Authorization': resp['access_token']}
@@ -45,10 +46,13 @@ class MindEdgeService():
             payload['cid'] = self.data['cid']
         else:
             payload['sid'] = self.data['sid']
+        
+        print('enrollment payload: ', payload)
 
         response = requests.post(self.url, json=payload, headers=self.auth_header)
 
         resp = response.json()
+        print('enrollment response: ', resp)
 
         if resp['status'] == 'fail':
             if resp['error'].lower() == 'Student already enrolled in course'.lower():
