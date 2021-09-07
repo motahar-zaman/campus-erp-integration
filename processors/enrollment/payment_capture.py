@@ -14,7 +14,7 @@ def capture_payment(payment, store_payment_gateway):
 
     createtransactionrequest = apicontractsv1.createTransactionRequest()
     createtransactionrequest.merchantAuthentication = merchant_auth
-    createtransactionrequest.refId = payment.transaction_request_id
+    createtransactionrequest.refId = str(payment.transaction_request_id)
 
     createtransactionrequest.transactionRequest = transactionrequest
     createtransactioncontroller = createTransactionController(createtransactionrequest)
