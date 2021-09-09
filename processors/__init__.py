@@ -24,9 +24,6 @@ def enroll_callback(ch, method, properties, body):
     if 'enrollment' in method.routing_key:
         print('* Enrolling')
         formatter = EnrollmentFormatter()
-        print('------------------------------------')
-        print(payload)
-        print('------------------------------------')
         data = formatter.enroll(payload)
         enroll(data)
         print('Done')
