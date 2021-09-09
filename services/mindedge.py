@@ -46,14 +46,8 @@ class MindEdgeService():
             payload['cid'] = self.data['cid']
         else:
             payload['sid'] = self.data['sid']
-        
-        print('enrollment payload: ', payload)
-        print('enrollment header: ', self.auth_header)
-
         response = requests.post(self.url, json=payload, headers=self.auth_header)
-
         resp = response.json()
-        print('enrollment response: ', resp)
 
         if resp['status'] == 'fail':
             if resp['error'].lower() == 'Student already enrolled in course'.lower():
