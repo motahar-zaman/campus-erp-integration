@@ -3,7 +3,7 @@ from services.mindedge import MindEdgeService
 from decouple import config
 from loggers.mongo import save_status_to_mongo
 from django_scopes import scopes_disabled
-from .payment_capture import capture_payment
+from .payments import payment_transaction
 from django_initializer import initialize_django
 initialize_django()
 
@@ -65,6 +65,8 @@ def enroll(message_data):
 
         enrollment.save()
         status_data = {'comment': 'authentication_failed', 'data': credentials}
+
+        payment_transaction(payment, store_payment_gateway, 'voidTransaction')
         save_status_to_mongo(status_data=status_data)
         return 0
 
@@ -75,6 +77,8 @@ def enroll(message_data):
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
         status_data = {'comment': 'failed', 'data': resp}
+
+        payment_transaction(payment, store_payment_gateway, 'voidTransaction')
         save_status_to_mongo(status_data=status_data)
 
         if message_data['enrollment_type'] == 'course':
@@ -126,7 +130,7 @@ def enroll(message_data):
         #########################################
         # initiate payment capture              #
         #########################################
-        capture_payment(payment, store_payment_gateway)
+        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
     else:
         print('enrollment successful')
         enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
