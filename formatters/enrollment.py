@@ -1,3 +1,4 @@
+from shared_models.models.enrollment import CourseEnrollment
 from django_initializer import initialize_django
 initialize_django()
 
@@ -23,6 +24,33 @@ class EnrollmentFormatter(object):
                 store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
             except StorePaymentGateway.DoesNotExist:
                 return {}
+            
+            try:
+                course_enrollment = CourseEnrollment.objects.get(id=payload['course_enrollment_id'])
+            except CourseEnrollment.DoesNotExist:
+                return {}
+        
+        if course_enrollment.course.course_provider.name.lower() == 'la roche':
+            la_roche_data = {
+                # 'student': {
+                #     'school_student_id': '',
+                #     'email': profile.primary_email,
+                #     'first_name': profile.first_name,
+                #     'last_name': profile.last_name
+                # },
+                # 'order_id': payload['cart_id'],
+                # 'products': [
+                #     {
+                #         'external_id': '1234',
+                #         'enrollment_id': payload['course_enrollment_id'],
+                #         'product_type': 'section'
+                #     }
+                # ],
+                # 'agreement_details': cart.agreement_details,
+                # 'registration_details': cart.registration_details
+            }
+
+            return la_roche_data
 
         data = {
             'data': {
