@@ -1,8 +1,7 @@
-from shared_models.models.enrollment import CourseEnrollment
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import Payment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
+from shared_models.models import Payment, CourseEnrollment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
 from django_scopes import scopes_disabled
 
 
@@ -54,7 +53,8 @@ class EnrollmentFormatter(object):
 
         data = {
             'data': {
-                'cid': payload['external_id']
+                'cid': payload['external_id'],
+                'login_link': payload['enrollment_login_link']
             },
             'erp': 'mindedge',
             'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
