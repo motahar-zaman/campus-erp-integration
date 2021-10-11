@@ -85,8 +85,8 @@ def import_courses_mongo(import_task):
                 is_success = False
                 print('execption: ', str(e))
                 import_task.status = 'failed'
-                msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
-                save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                msg = {'type': 'ImportTask', 'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
+                save_status_to_mongo(status_data=msg, collection='error_log')
                 import_task.status_message = row['external_id'] + ': create error'
                 import_task.save()
 
@@ -155,8 +155,8 @@ def import_courses_postgres(import_task):
                                 external_image_url=course_model.default_image,
                             )
                         except Exception as e:
-                            msg = {'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
-                            save_status_to_mongo(status_data=msg, collection='ImportTaskErrorLog')
+                            msg = {'type': 'ImportTask', 'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
+                            save_status_to_mongo(status_data=msg, collection='error_log')
                         import_task.queue_processed = 2
                     else:
                         course.course_provider = import_task.course_provider
