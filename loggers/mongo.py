@@ -2,7 +2,7 @@ import mongoengine
 import datetime
 from mongoengine import get_db
 
-def save_status_to_mongo(status_data=None, collection='EnrollmentStatusHistory'):
+def save_status_to_mongo(status_data=None, collection='enrollment_status_history'):
     print('logging status to mongo')
 
     try:
