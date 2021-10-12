@@ -7,20 +7,39 @@ from .payments import payment_transaction
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import CourseEnrollment, CertificateEnrollment, LMSAccess, PaymentRefund, Certificate, Course
+from shared_models.models import CourseEnrollment, CertificateEnrollment, LMSAccess, PaymentRefund, Certificate, Course, StoreConfiguration
 
 
-configs = {
-    'mindedge': {
-        'processor_class': MindEdgeService,
-        'credentials': {
-            'username': config('MINDEDGE_USERNAME', 'jenzabar'),
-            'password': config('MINDEDGE_PASSWORD', 'jz_me_api'),
-            'token': config('MINDEDGE_TOKEN', '09d66f6e5482d9b0ba91815c350fd9af3770819b'),
-            'url': config('MINDEDGE_URL', 'https://api.mindedgeuniversity.com/v1/studentService'),
+def get_erp_config(erp, store):
+    erp_config = {}
+    configs = {
+        'mindedge': {
+            'processor_class': MindEdgeService,
+            'credentials': {
+                'username': config('MINDEDGE_USERNAME', 'jenzabar'),
+                'password': config('MINDEDGE_PASSWORD', 'jz_me_api'),
+                'token': config('MINDEDGE_TOKEN', '09d66f6e5482d9b0ba91815c350fd9af3770819b'),
+                'url': config('MINDEDGE_URL', 'https://api.mindedgeuniversity.com/v1/studentService'),
+            }
         }
     }
-}
+
+    try:
+        store_configuration = store.store_configurations.get(
+            external_entity__entity_type='enrollment_config',
+            external_entity__entity_name__iexact=erp
+        )
+    except StoreConfiguration.DoesNotExist:
+        try:
+            return configs[erp]
+        except KeyError:
+            save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
+            return 1
+
+    erp_config['processor_class'] = MindEdgeService
+    erp_config['credentials'] = store_configuration.config_value
+
+    return erp_config
 
 
 def enroll(message_data):
@@ -43,11 +62,7 @@ def enroll(message_data):
         save_status_to_mongo(status_data={'comment': 'unknown data format'})
         return 1
 
-    try:
-        erp_config = configs[erp]
-    except KeyError:
-        save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
-        return 1
+    erp_config = get_erp_config(erp, store_payment_gateway.store)
 
     processor_class = erp_config['processor_class']
     credentials = erp_config['credentials']
