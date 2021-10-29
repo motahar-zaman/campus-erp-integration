@@ -41,7 +41,7 @@ configs = {
         'processor_class': MindEdgeService,
         'credentials': {
             'username': config('MINDEDGE_USERNAME', 'jenzabar'),
-            'password': config('MINDEDGE_PASSWORD', 'jz_me_api'),
+            'password': config('MINDEDGE_PASSWORD', '...no..pass...'),
             'token': config('MINDEDGE_TOKEN', '09d66f6e5482d9b0ba91815c350fd9af3770819b'),
             'url': config('MINDEDGE_URL', 'https://api.mindedgeuniversity.com/v1/studentService'),
         }
