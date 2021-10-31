@@ -1,0 +1,108 @@
+from django_initializer import initialize_django
+initialize_django()
+
+from shared_models.models import Payment, CourseEnrollment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
+from django_scopes import scopes_disabled
+
+
+class EnrollmentFormatter(object):
+    def enroll(self, payload):
+        print('formatting enrollment data....')
+        try:
+            profile = Profile.objects.get(id=payload['profile_id'])
+        except Profile.DoesNotExist:
+            return {}
+        
+        with scopes_disabled():
+            try:
+                payment = Payment.objects.get(id=payload['payment_id'])
+            except Payment.DoesNotExist:
+                return {}
+
+            try:
+                store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
+            except StorePaymentGateway.DoesNotExist:
+                return {}
+            
+            try:
+                course_enrollment = CourseEnrollment.objects.get(id=payload['course_enrollment_id'])
+            except CourseEnrollment.DoesNotExist:
+                return {}
+        
+        if course_enrollment.course.course_provider.name.lower() == 'la roche':
+            la_roche_data = {
+                # 'student': {
+                #     'school_student_id': '',
+                #     'email': profile.primary_email,
+                #     'first_name': profile.first_name,
+                #     'last_name': profile.last_name
+                # },
+                # 'order_id': payload['cart_id'],
+                # 'products': [
+                #     {
+                #         'external_id': '1234',
+                #         'enrollment_id': payload['course_enrollment_id'],
+                #         'product_type': 'section'
+                #     }
+                # ],
+                # 'agreement_details': cart.agreement_details,
+                # 'registration_details': cart.registration_details
+            }
+
+            return la_roche_data
+
+        data = {
+            'data': {
+                'cid': payload['external_id'],
+                'login_link': payload['enrollment_login_link']
+            },
+            'erp': 'mindedge',
+            'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
+            'action': 'enroll',
+            'enrollment_type': 'course',
+            'enrollment_id': payload['course_enrollment_id'],
+            'cart_id': payload['cart_id'],
+            'payment': payment,
+            'store_payment_gateway': store_payment_gateway
+        }
+        print('formatting done: ', data)
+        return data
+
+    def unenroll(self, payload):
+        with scopes_disabled():
+            try:
+                refund = PaymentRefund.objects.get(id=payload['refund_id'])
+            except KeyError:
+                return {}
+            except PaymentRefund.DoesNotExist:
+                return {}
+
+            try:
+                cart_item = refund.payment.cart.cart_items.first()
+            except CartItem.DoesNotExist:
+                certificate_id = ''
+                course_id = ''
+            else:
+                try:
+                    store_certificate = StoreCertificate.objects.get(product=cart_item.product)
+                except (StoreCertificate.DoesNotExist, StoreCertificate.MultipleObjectsReturned):
+                    certificate_id = ''
+                else:
+                    certificate_id = str(store_certificate.certificate.id)
+
+                try:
+                    store_course_section = StoreCourseSection.objects.get(product=cart_item.product)
+                except (StoreCourseSection.DoesNotExist, StoreCourseSection.MultipleObjectsReturned):
+                    course_id = ''
+                else:
+                    course_id = str(store_course_section.store_course.course.id)
+
+        data = {
+            'refund_id': str(refund.id),
+            'student_name': f'{refund.payment.cart.profile.first_name} {refund.payment.cart.profile.last_name}',
+            'student_email': refund.payment.cart.profile.primary_email,
+            'certificate': certificate_id,
+            'course': course_id
+        }
+
+        return data

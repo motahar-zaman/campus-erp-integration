@@ -40,13 +40,16 @@ class MindEdgeService():
             'login_link': True
         }
 
+        if 'login_link' in self.data.keys():
+            if not self.data['login_link']:
+                del payload['login_link']
+
         if 'cid' in self.data.keys():
             payload['cid'] = self.data['cid']
         else:
             payload['sid'] = self.data['sid']
 
         response = requests.post(self.url, json=payload, headers=self.auth_header)
-
         resp = response.json()
 
         if resp['status'] == 'fail':
