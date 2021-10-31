@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'shared_models',
+    'rest_framework_api_key'
 ]
 
 DATABASES = {
