@@ -7,7 +7,6 @@ from django_scopes import scopes_disabled
 
 class EnrollmentFormatter(object):
     def enroll(self, payload):
-        print('formatting enrollment data....')
         try:
             profile = Profile.objects.get(id=payload['profile_id'])
         except Profile.DoesNotExist:
@@ -28,35 +27,13 @@ class EnrollmentFormatter(object):
                 course_enrollment = CourseEnrollment.objects.get(id=payload['course_enrollment_id'])
             except CourseEnrollment.DoesNotExist:
                 return {}
-        
-        if course_enrollment.course.course_provider.name.lower() == 'la roche':
-            la_roche_data = {
-                # 'student': {
-                #     'school_student_id': '',
-                #     'email': profile.primary_email,
-                #     'first_name': profile.first_name,
-                #     'last_name': profile.last_name
-                # },
-                # 'order_id': payload['cart_id'],
-                # 'products': [
-                #     {
-                #         'external_id': '1234',
-                #         'enrollment_id': payload['course_enrollment_id'],
-                #         'product_type': 'section'
-                #     }
-                # ],
-                # 'agreement_details': cart.agreement_details,
-                # 'registration_details': cart.registration_details
-            }
-
-            return la_roche_data
 
         data = {
             'data': {
                 'cid': payload['external_id'],
                 'login_link': payload['enrollment_login_link']
             },
-            'erp': 'mindedge',
+            'erp': 'none',
             'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
             'action': 'enroll',
             'enrollment_type': 'course',
@@ -65,7 +42,7 @@ class EnrollmentFormatter(object):
             'payment': payment,
             'store_payment_gateway': store_payment_gateway
         }
-        print('formatting done: ', data)
+        
         return data
 
     def unenroll(self, payload):

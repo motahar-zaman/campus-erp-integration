@@ -12,17 +12,6 @@ from shared_models.models import CourseEnrollment, CertificateEnrollment, LMSAcc
 
 def get_erp_config(erp, store):
     erp_config = {}
-    configs = {
-        'mindedge': {
-            'processor_class': MindEdgeService,
-            'credentials': {
-                'username': config('MINDEDGE_USERNAME', 'jenzabar'),
-                'password': config('MINDEDGE_PASSWORD', 'jz_me_api'),
-                'token': config('MINDEDGE_TOKEN', '09d66f6e5482d9b0ba91815c350fd9af3770819b'),
-                'url': config('MINDEDGE_URL', 'https://api.mindedgeuniversity.com/v1/studentService'),
-            }
-        }
-    }
 
     try:
         store_configuration = store.store_configurations.get(
@@ -30,11 +19,8 @@ def get_erp_config(erp, store):
             external_entity__entity_name__iexact=erp
         )
     except StoreConfiguration.DoesNotExist:
-        try:
-            return configs[erp]
-        except KeyError:
-            save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
-            return 1
+        save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
+        return 1
 
     erp_config['processor_class'] = MindEdgeService
     erp_config['credentials'] = store_configuration.config_value
@@ -60,6 +46,18 @@ def enroll(message_data):
         store_payment_gateway = message_data.pop('store_payment_gateway')
     except KeyError:
         save_status_to_mongo(status_data={'comment': 'unknown data format'})
+        return 1
+
+    if erp == 'none':
+        if message_data['enrollment_type'] == 'course':
+            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CourseEnrollment.STATUS_SUCCESS
+        else:
+            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
+            enrollment.status = CertificateEnrollment.STATUS_SUCCESS
+        
+        enrollment.save()
+        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
         return 1
 
     erp_config = get_erp_config(erp, store_payment_gateway.store)
