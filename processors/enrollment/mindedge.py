@@ -55,9 +55,10 @@ def enroll(message_data):
         else:
             enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
             enrollment.status = CertificateEnrollment.STATUS_SUCCESS
-        
+
         enrollment.save()
-        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+        if store_payment_gateway:
+            payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
         return 1
 
     erp_config = get_erp_config(erp, store_payment_gateway.store)
