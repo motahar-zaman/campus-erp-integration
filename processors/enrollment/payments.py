@@ -1,7 +1,7 @@
+from campuslibs.loggers.mongo import save_to_mongo
 from authorizenet import apicontractsv1
 from authorizenet.apicontrollers import *
 from decouple import config
-from loggers.mongo import save_status_to_mongo
 
 def payment_transaction(payment, store_payment_gateway, transaction_type):
     authorizenet_base_api = config('AUTHORIZE_NET_BASE_API', 'https://apitest.authorize.net/xml/v1/request.api')
@@ -26,6 +26,8 @@ def payment_transaction(payment, store_payment_gateway, transaction_type):
     response = createtransactioncontroller.getresponse()
 
     if (response.messages.resultCode=="Ok"):
-        save_status_to_mongo(status_data={'payment_status': 'success', 'transaction_id': response.transactionResponse.transId, 'description': response.transactionResponse.messages.message[0].description, 'transaction_type': transaction_type})
+        status_data={'type': 'payment', 'payment_status': 'success', 'transaction_id': response.transactionResponse.transId, 'description': response.transactionResponse.messages.message[0].description, 'transaction_type': transaction_type}
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
     else:
-        save_status_to_mongo(status_data={'payment_status': 'failed', 'payment_id': str(payment.id), 'transaction_type': transaction_type})
+        status_data={'type': 'payment', 'payment_status': 'failed', 'payment_id': str(payment.id), 'transaction_type': transaction_type}
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
