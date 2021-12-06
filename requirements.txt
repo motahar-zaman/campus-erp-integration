@@ -15,6 +15,8 @@ deepmerge==0.1.0
 distlib==0.3.0
 distro==1.4.0
 Django==3.1.4
+django-rest-framework-mongoengine==3.4.1
+djangorestframework==3.12.1
 django-scopes==1.2.0
 docutils==0.15.2
 elasticsearch==7.5.1
