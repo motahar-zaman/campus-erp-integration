@@ -1,31 +1,34 @@
 import requests
+from campuslibs.loggers.mongo import save_to_mongo
 from decouple import config
-from loggers.mongo import save_status_to_mongo
 from django_scopes import scopes_disabled
-
 from django_initializer import initialize_django
-initialize_django()
-
-from shared_models.models import Profile, PaymentRefund
 from django.core.exceptions import ValidationError
 
 
-def add_or_update_user(data):
-    HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
-    HUBSPOT_CONTACT_CREATION_FORM_ID = config('HUBSPOT_CONTACT_CREATION_FORM_ID')
+initialize_django()
+from shared_models.models import Profile, PaymentRefund
 
-    url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CONTACT_CREATION_FORM_ID}'
+
+def add_or_update_user(data):
+    hubspot_portal_id = config('HUBSPOT_PORTAL_ID')
+    hubspot_cart_creation_form_id = config('HUBSPOT_CONTACT_CREATION_FORM_ID')
+
+    url = f'https://api.hsforms.com/submissions/v3/integration/submit/{hubspot_portal_id}/' \
+          f'{hubspot_cart_creation_form_id}'
 
     try:
         profile_id = data['profile_id']
     except KeyError:
-        save_status_to_mongo(status_data={'comment': 'unknown data format'})
+        save_to_mongo(data={'type': 'crm-hubspot', 'comment': 'unknown data format'},
+                      collection='enrollment_status_history')
         return
 
     try:
         profile = Profile.objects.get(id=profile_id)
     except Profile.DoesNotExist:
-        save_status_to_mongo(status_data={'comment': 'profile not found'})
+        save_to_mongo(data={'type': 'crm-hubspot', 'comment': 'profile not found'},
+                      collection='enrollment_status_history')
         return
 
     data = {
@@ -55,23 +58,23 @@ def add_or_update_user(data):
 
     resp = requests.post(url, json=data)
     if resp.status_code == 200:
-        save_status_to_mongo(status_data={'comment': 'success', 'data': resp.json()})
-
+        save_to_mongo(data={'type': 'crm-hubspot', 'comment': 'success', 'data': resp.json()},
+                      collection='enrollment_status_history')
     else:
-        save_status_to_mongo(status_data={'comment': 'failed', 'data': resp.json()})
+        save_to_mongo(data={'type': 'crm-hubspot', 'comment': 'failed', 'data': resp.json()},
+                      collection='enrollment_status_history')
 
     return resp.status_code
 
 
 def add_or_update_product(data):
-    HUBSPOT_PORTAL_ID = config('HUBSPOT_PORTAL_ID')
-    HUBSPOT_CART_CREATION_FORM_ID = config('HUBSPOT_CART_CREATION_FORM_ID')
+    hubspot_portal_id = config('HUBSPOT_PORTAL_ID')
+    hubspot_cart_creation_form_id = config('HUBSPOT_CART_CREATION_FORM_ID')
 
-    url = f'https://api.hsforms.com/submissions/v3/integration/submit/{HUBSPOT_PORTAL_ID}/{HUBSPOT_CART_CREATION_FORM_ID}'
+    url = f'https://api.hsforms.com/submissions/v3/integration/submit/{hubspot_portal_id}/' \
+          f'{hubspot_cart_creation_form_id}'
 
-    refund_id = None
     refund = None
-
     try:
         refund_id = data['refund_id']
     except KeyError:

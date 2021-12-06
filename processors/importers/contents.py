@@ -1,17 +1,18 @@
-import json
-import pika
-from decouple import config
+
 from bson import ObjectId
-from openpyxl import load_workbook
-from io import BytesIO
-import urllib.request
-import pandas as pd
-from loggers.mongo import save_status_to_mongo
+from campuslibs.loggers.mongo import save_to_mongo
 from config import mongo_client
-from django_initializer import initialize_django
 from datetime import datetime
+from decouple import config
 from django.utils.formats import get_format
+from django_initializer import initialize_django
 from itertools import groupby
+from openpyxl import load_workbook
+import json
+import pandas as pd
+import pika
+
+
 initialize_django()
 
 from shared_models.models import Course, Section
@@ -86,7 +87,7 @@ def import_courses_mongo(import_task):
                 print('execption: ', str(e))
                 import_task.status = 'failed'
                 msg = {'type': 'ImportTask', 'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
-                save_status_to_mongo(status_data=msg, collection='error_log')
+                save_to_mongo(data=msg, collection='error_log')
                 import_task.status_message = row['external_id'] + ': create error'
                 import_task.save()
 
@@ -156,7 +157,7 @@ def import_courses_postgres(import_task):
                             )
                         except Exception as e:
                             msg = {'type': 'ImportTask', 'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
-                            save_status_to_mongo(status_data=msg, collection='error_log')
+                            save_to_mongo(data=msg, collection='error_log')
                         import_task.queue_processed = 2
                     else:
                         course.course_provider = import_task.course_provider
