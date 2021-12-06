@@ -2,7 +2,7 @@ import pika
 import sys
 import os
 from decouple import config
-from processors import enroll_callback, refund_callback, import_callback
+from processors import enroll_callback, refund_callback, import_callback, publish_callback
 
 
 def main():
@@ -31,6 +31,10 @@ def main():
     channel.queue_declare(queue_refund, exclusive=True)
     channel.queue_bind(exchange=exchange_campus, queue=queue_refund, routing_key='*.refund')
     channel.basic_consume(queue=queue_refund, on_message_callback=refund_callback, auto_ack=True)
+
+    import_queue = channel.queue_declare('', exclusive=True)
+    channel.queue_bind(exchange='campusmq', queue=import_queue.method.queue, routing_key='*.publish')
+    channel.basic_consume(queue=import_queue.method.queue, on_message_callback=publish_callback, auto_ack=True)
 
     print(' [*] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
