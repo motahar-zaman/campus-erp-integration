@@ -1,7 +1,7 @@
+from campuslibs.loggers.mongo import save_to_mongo
 from django.core.mail import send_mail
 from services.mindedge import MindEdgeService
 from decouple import config
-from loggers.mongo import save_status_to_mongo
 from django_scopes import scopes_disabled
 from .payments import payment_transaction
 from django_initializer import initialize_django
@@ -19,7 +19,8 @@ def get_erp_config(erp, store):
             external_entity__entity_name__iexact=erp
         )
     except StoreConfiguration.DoesNotExist:
-        save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
+        save_to_mongo(data={'type': 'erp', 'comment': erp + ' not implemented'},
+                      collection='enrollment_status_history')
         return 1
 
     erp_config['processor_class'] = MindEdgeService
@@ -45,7 +46,8 @@ def enroll(message_data):
         payment = message_data.pop('payment')
         store_payment_gateway = message_data.pop('store_payment_gateway')
     except KeyError:
-        save_status_to_mongo(status_data={'comment': 'unknown data format'})
+        save_to_mongo(data={'type': 'erp', 'comment': 'unknown data format'},
+                      collection='enrollment_status_history')
         return 1
 
     if erp == 'none':
@@ -78,22 +80,22 @@ def enroll(message_data):
             enrollment.status = CertificateEnrollment.STATUS_FAILED
 
         enrollment.save()
-        status_data = {'comment': 'authentication_failed', 'data': credentials}
+        status_data = {'type': 'erp', 'comment': 'authentication_failed', 'data': credentials}
 
         payment_transaction(payment, store_payment_gateway, 'voidTransaction')
-        save_status_to_mongo(status_data=status_data)
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
         return 0
 
-    status_data = {'comment': 'erp_authenticated', 'data': credentials}
-    save_status_to_mongo(status_data=status_data)
+    status_data = {'type': 'erp', 'comment': 'erp_authenticated', 'data': credentials}
+    save_to_mongo(data=status_data, collection='enrollment_status_history')
     action = getattr(processor_obj, action)
     resp = action()
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
-        status_data = {'comment': 'failed', 'data': resp}
+        status_data = {'type': 'erp', 'comment': 'failed', 'data': resp}
 
         payment_transaction(payment, store_payment_gateway, 'voidTransaction')
-        save_status_to_mongo(status_data=status_data)
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
 
         if message_data['enrollment_type'] == 'course':
             enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
@@ -104,8 +106,8 @@ def enroll(message_data):
             enrollment.status = CertificateEnrollment.STATUS_FAILED
         return 0
 
-    status_data = {'comment': 'enrolled', 'data': resp}
-    save_status_to_mongo(status_data=status_data)
+    status_data = {'type': 'erp', 'comment': 'enrolled', 'data': resp}
+    save_to_mongo(data=status_data, collection='enrollment_status_history')
 
     if message_data['enrollment_type'] == 'course':
         enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
@@ -131,8 +133,8 @@ def enroll(message_data):
 
         enrollment.status = CourseEnrollment.STATUS_SUCCESS
 
-        status_data = {'comment': 'lms_created'}
-        save_status_to_mongo(status_data=status_data)
+        status_data = {'type': 'erp', 'comment': 'lms_created'}
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
 
         LMSAccess.objects.update_or_create(
             course_enrollment=enrollment,
