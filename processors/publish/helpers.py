@@ -4,6 +4,12 @@ from decimal import Decimal
 
 from datetime import datetime
 
+def write_status(doc, status):
+    print('----------ERROR----------')
+    print(status)
+    print('-------------------------')
+    return
+
 
 def get_schedules(data):
     schedules = []
@@ -95,25 +101,6 @@ def prepare_section_mongo(data, course_provider_model):
     return section_data
 
 
-def prepare_course_mongo(data, course_provider_model_id):
-    level = data.get('level', None)
-    if level not in ['beginner', 'intermediate', 'advanced']:
-        level = ''
-
-    course_model_data = {
-        '_cls': 'Course',
-        'provider': ObjectId(course_provider_model_id),
-        'from_importer': True,
-        'external_id': data.get('external_id'),
-        'code': data.get('code'),
-        'title': data.get('course_title'),
-        'slug': data.get('slug'),
-        'description': data.get('description'),
-        'sections': []  # the courses will be updated later with list of sections
-    }
-    return course_model_data
-
-
 def get_datetime_obj(date_time_str):
     if date_time_str is None or date_time_str == '':
         return None
@@ -135,28 +122,20 @@ def get_datetime_obj(date_time_str):
     return datetime_obj
 
 
-def upsert_mongo_doc(collection=None, query=None, data=None):
-    db = get_db()
-    coll = db[collection]
-    doc = coll.find_one(query)
-    if doc is None:
-        result = coll.insert_one(data)
-        return result.inserted_id
-    else:
-        if collection not in ['course_provider_site', 'instructor']:
-            result = db.course.update_one(query, {'$set': data}, upsert=True)
-        return doc['_id']
-    return None
-
-
-def prepare_course_postgres(data, course_provider_id):
+def prepare_course_postgres(course_model, course_provider):
+    course_image_uri = None
+    try:
+        course_image_uri = course_model.image['original']
+    except KeyError:
+        pass
     course_data = {
-        'course_provider': course_provider_id,
-        'title': data.get('course_title'),
-        'slug': data.get('slug'),
-        'course_image_uri': data.get('course_image_uri', None),
-        'content_ready': data.get('content_ready', False),
-        'external_image_url': data.get('external_image_url', None),
+        'course_provider': course_provider.id,
+        'title': course_model.title,
+        'slug': course_model.slug,
+        'content_db_reference': str(course_model.id),
+        'course_image_uri': course_image_uri,
+        'content_ready': False,
+        'external_image_url': None,
     }
     return course_data
 
@@ -173,13 +152,13 @@ def get_execution_site(data, course_provider_model):
     return doc_id
 
 
-def prepare_section_postgres(data, course, course_model):
+def prepare_section_postgres(data, fee, course, course_model):
     section_data = {
         'course': course.id,
         'name': data.get('code'),
-        'fee': Decimal(data.get('course_fee', '0.00')),
+        'fee': fee,
         'seat_capacity': data.get('num_seats'),
-        'available_seat': data.get('num_seats'),
+        'available_seat': data.get('available_seats'),
         'execution_mode': data.get('execution_mode', 'self-paced'),
         'registration_deadline': get_datetime_obj(data.get('registration_deadline')),
         'content_db_reference': str(course_model.id),
