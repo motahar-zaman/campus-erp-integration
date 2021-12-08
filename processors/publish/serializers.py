@@ -5,6 +5,7 @@ from shared_models.models import Course, Section, Product
 from models.course.section import Section as SectionModel
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.course.course import Course as CourseModel
+from models.courseprovider.instructor import Instructor as InstructorModel
 
 from rest_framework_mongoengine.fields import ReferenceField
 
@@ -56,3 +57,12 @@ class CheckSectionModelValidationSerializer(EmbeddedDocumentSerializer):
 
     class Meta:
         model = SectionModel
+
+
+class InstructorModelSerializer(DocumentSerializer):
+    provider = ReferenceField(CourseProviderModel)
+
+    class Meta:
+        model = InstructorModel
+        fields = ('id', 'provider', 'name', 'external_id',
+                  'profile_urls', 'image', 'short_bio', 'detail_bio')
