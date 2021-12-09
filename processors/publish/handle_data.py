@@ -172,9 +172,9 @@ def create_schedules(doc, data, course_provider_model):
     for section in course_model.sections:
         if section['external_id'] == data['parent']:
             serializer = CheckSectionModelValidationSerializer(section)
-            for schedule in section['schedules']:
-                if schedule['name'] == data['data']['name']:
-                    pass
+            for idx, schedule in enumerate(serializer.data['schedules']):
+                if schedule['external_id'] == data['data']['external_id']:
+                    serializer.data['schedules'][idx].update(data['data'])
                 else:
                     serializer.data['schedules'].append(data['data'])
 
