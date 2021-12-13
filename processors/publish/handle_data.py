@@ -13,7 +13,7 @@ from .helpers import (
     write_status
 )
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer
+from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 from django_initializer import initialize_django
@@ -169,15 +169,24 @@ def create_schedules(doc, data, course_provider_model):
     except KeyError:
         data['data']['end_at'] = None
 
+    # check if the provided data is valid. if not, abort.
+    schedule_serializer = SectionScheduleModelSerializer(data=data['data'])
+    if not schedule_serializer.is_valid():
+        write_status(doc, schedule_serializer.errors)
+        return
+
     for section in course_model.sections:
         if section['external_id'] == data['parent']:
             serializer = CheckSectionModelValidationSerializer(section)
-            for idx, schedule in enumerate(serializer.data['schedules']):
-                if schedule['external_id'] == data['data']['external_id']:
-                    serializer.data['schedules'][idx].update(data['data'])
-                else:
-                    serializer.data['schedules'].append(data['data'])
+            if serializer.data['schedules']:
+                for idx, schedule in enumerate(serializer.data['schedules']):
 
+                    if schedule['external_id'] == data['data']['external_id']:
+                        serializer.data['schedules'][idx].update(schedule_serializer.data)
+                    else:
+                        serializer.data['schedules'].append(schedule_serializer.data)
+            else:
+                serializer.data['schedules'].append(schedule_serializer.data)
             CourseModel.objects(
                 id=course_model.id,
                 sections__code=section['code'],
@@ -314,7 +323,6 @@ def publish(doc_id):
         for item in records:
             if item['type'] == 'section':
                 create_sections(doc, item, course_provider, course_provider_model, contracts=contracts)
-
             if item['type'] == 'schedule':
                 create_schedules(doc, item, course_provider_model)
             if item['type'] == 'instructor':

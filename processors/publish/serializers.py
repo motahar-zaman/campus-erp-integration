@@ -6,6 +6,7 @@ from models.course.section import Section as SectionModel
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.course.course import Course as CourseModel
 from models.courseprovider.instructor import Instructor as InstructorModel
+from models.course.section_schedule import SectionSchedule as SectionScheduleModel
 
 from rest_framework_mongoengine.fields import ReferenceField
 
@@ -66,3 +67,9 @@ class InstructorModelSerializer(DocumentSerializer):
         model = InstructorModel
         fields = ('id', 'provider', 'name', 'external_id',
                   'profile_urls', 'image', 'short_bio', 'detail_bio')
+
+
+class SectionScheduleModelSerializer(EmbeddedDocumentSerializer):
+
+    class Meta:
+        model = SectionScheduleModel

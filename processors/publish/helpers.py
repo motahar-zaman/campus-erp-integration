@@ -5,9 +5,13 @@ from decimal import Decimal
 from datetime import datetime
 
 def write_status(doc, status):
-    print('----------ERROR----------')
+    print('--------------------------')
     print(status)
-    print('-------------------------')
+    print('--------------------------')
+    db = get_db()
+    coll = db['publish_job']
+    doc['status'] = status
+    coll.update_one({'_id': doc['_id']}, {"$set": doc}, upsert=True)
     return
 
 
