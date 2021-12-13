@@ -283,6 +283,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 def publish(doc_id):
     doc = get_data(doc_id, collection='publish_job')
     if doc:
+        write_status(doc, 'request received')
         try:
             course_provider_id = doc['course_provider_id']
         except KeyError:
