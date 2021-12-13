@@ -236,6 +236,7 @@ def create_instructors(doc, data, course_provider_model):
 def create_courses(doc, course_provider, course_provider_model, records, contracts=[]):
     for item in records:
         if item['type'] == 'course':
+            write_status(doc, 'course type item found')
             data = item['data']
             level = data.get('level', None)
             if level not in ['beginner', 'intermediate', 'advanced']:
@@ -255,8 +256,9 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             else:
                 write_status(doc, course_model_serializer.errors)
                 return
-
+            write_status(doc, 'course saved in mongodb. trying to get data formatted for postgres.')
             course_data = prepare_course_postgres(course_model, course_provider)
+            write_status(doc, course_data)
 
             with scopes_disabled():
                 try:
@@ -309,10 +311,12 @@ def publish(doc_id):
             return
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
-
+        if contracts.count() > 0:
+            write_status(doc, 'contracts found')
         try:
             records = doc['payload']['records']
         except KeyError:
+            write_status(doc, 'payload does not contain any records')
             return
         # create courses first
         # because without courses everything else will not exist
@@ -329,4 +333,5 @@ def publish(doc_id):
             if item['type'] == 'instructor':
                 create_instructors(doc, item, course_provider_model)
         print('message processing complete')
+        write_status(doc, 'message processing complete')
         # now handle everyting else
