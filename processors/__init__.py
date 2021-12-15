@@ -5,7 +5,7 @@ from formatters.crm import CRMFormatter
 from formatters.tax import TaxFormatter
 from formatters.importers import ImportFormatter
 
-from processors.enrollment.mindedge import enroll, unenroll
+from processors.enrollment.common import enroll, unenroll
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
 from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo, import_sections_postgres
