@@ -42,10 +42,12 @@ def enroll(enrollment_data):
                     handle_mindedge_enrollment(erp, profile, erp_data, message_data, enrollment)
 
         if data['erp'] == 'j1':
-            payment_obj = data['data'].pop('payment_obj', None)
-            store_payment_gateway_obj = data['data'].pop('store_payment_gateway_obj', None)
+            payment = data['data'].pop('payment_obj', None)
+            store_payment_gateway = data['data'].pop('store_payment_gateway_obj', None)
             handle_j1_enrollment(data['data'])
-    payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+
+    if payment.amount > 0.0:
+        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
 
 
 def unenroll(data):
