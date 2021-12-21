@@ -19,7 +19,6 @@ class EnrollmentFormatter(object):
                 'cid': external_id,
                 'login_link': True
             },
-            'erp': 'none',
             'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
             'action': 'enroll',
             'enrollment_type': 'course',
@@ -30,7 +29,7 @@ class EnrollmentFormatter(object):
             'store_payment_gateway': store_payment_gateway
         }
 
-    def j1(self, profile, external_id, course_enrollment, payment, payload):
+    def j1(self, profile, external_id, course_enrollment, payment):
         registration_details = {}
         reg_info = {}
         # getting registration info
@@ -92,75 +91,74 @@ class EnrollmentFormatter(object):
         j1_data = {
             'enrollments': []
         }
-        for profile_id, external_id, enrollment_id in zip(payload['profile_id'], payload['external_id'], payload['course_enrollment_id']):
+
+        payment = None
+        try:
             with scopes_disabled():
-                try:
-                    profile = Profile.objects.get(id=profile_id)
-                except Profile.DoesNotExist:
-                    continue
-
-                try:
-                    course_enrollment = CourseEnrollment.objects.get(id=enrollment_id)
-                except CourseEnrollment.DoesNotExist:
-                    continue
-
-                try:
-                    payment = Payment.objects.get(id=payload['payment_id'])
-                except Payment.DoesNotExist:
-                    continue
-            if course_enrollment.course.course_provider.code == 'mindedge':
-                mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
-
-            elif course_enrollment.course.course_provider.code == 'j1':
+                payment = Payment.objects.get(id=payload['payment_id'])
+                
+            for profile_id, external_id, enrollment_id in zip(payload['profile_id'], payload['external_id'], payload['course_enrollment_id']):
                 with scopes_disabled():
                     try:
-                        store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
-                    except StorePaymentGateway.DoesNotExist:
-                        store_payment_gateway = None
-
-                j1_data['payment_obj'] = payment
-                j1_data['store_payment_gateway_obj'] = store_payment_gateway
-
-                j1_data['order_id'] = str(payment.cart.ref_id)
-                j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment, payload))
-
-                j1_data['payment'] = {
-                    'amount': str(payment.amount),
-                    'currency_code': payment.currency_code,
-                    'transaction_reference': payment.transaction_reference,
-                    'auth_code': payment.auth_code,
-                    'payment_type': payment.payment_type,
-                    'bank': payment.bank,
-                    'account_number': payment.account_number,
-                    'card_type': payment.card_type,
-                    'card_number': payment.card_number,
-                    'reason_code': payment.reason_code,
-                    'reason_description': payment.reason_description,
-                    'customer_ip': payment.customer_ip,
-                    'status': payment.status,
-                    'transaction_time': str(payment.transaction_time),
-                },
-                agreement_details = {}
-                for key, val in payment.cart.agreement_details.items():
-                    try:
-                        question = QuestionBank.objects.get(id=key)
-                    except (QuestionBank.DoesNotExist, ValidationError):
+                        profile = Profile.objects.get(id=profile_id)
+                    except Profile.DoesNotExist:
                         continue
-                    agreement_details[question.external_id] = val
-                j1_data['agreement_details'] = agreement_details
-            else:
-                mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
 
-        return [{
-            'erp': 'mindedge',
-            'data': mindedge_data
-        }, {
-            'erp': 'j1',
-            'data': j1_data
-        }, {
-            'erp': 'none',
-            'data': common_data
-        }]
+                    try:
+                        course_enrollment = CourseEnrollment.objects.get(id=enrollment_id)
+                        course_enrollment.status = CourseEnrollment.STATUS_PENDING
+                        course_enrollment.save()
+                    except CourseEnrollment.DoesNotExist:
+                        continue
+                
+                if course_enrollment.course.course_provider.code == 'mindedge':
+                    mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
+                elif course_enrollment.course.course_provider.code == 'j1':
+                    j1_data['order_id'] = str(payment.cart.ref_id)
+                    j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    j1_data['payment'] = {
+                        'amount': str(payment.amount),
+                        'currency_code': payment.currency_code,
+                        'transaction_reference': payment.transaction_reference,
+                        'auth_code': payment.auth_code,
+                        'payment_type': payment.payment_type,
+                        'bank': payment.bank,
+                        'account_number': payment.account_number,
+                        'card_type': payment.card_type,
+                        'card_number': payment.card_number,
+                        'reason_code': payment.reason_code,
+                        'reason_description': payment.reason_description,
+                        'customer_ip': payment.customer_ip,
+                        'status': payment.status,
+                        'transaction_time': str(payment.transaction_time),
+                    },
+                    agreement_details = {}
+                    for key, val in payment.cart.agreement_details.items():
+                        try:
+                            question = QuestionBank.objects.get(id=key)
+                        except (QuestionBank.DoesNotExist, ValidationError):
+                            continue
+                        agreement_details[question.external_id] = val
+                    j1_data['agreement_details'] = agreement_details
+                else:
+                    common_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
+        except Payment.DoesNotExist:
+            pass
+
+        return {
+            'erp_list':[{
+                'erp': 'mindedge',
+                'data': mindedge_data
+            }, {
+                'erp': 'j1',
+                'data': j1_data
+            }, {
+                'erp': 'none',
+                'data': common_data
+            }],
+            'payment': payment,
+            'store_payment_gateway_id': payload['store_payment_gateway_id']
+        }
 
 
     def unenroll(self, payload):

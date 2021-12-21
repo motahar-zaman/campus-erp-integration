@@ -1,6 +1,6 @@
 from services.mindedge import MindEdgeService
 
-def handle_mindedge_enrollment(erp, profile, data, message_data, enrollment):
+def handle_mindedge_enrollment(profile, data, message_data, enrollment):
     print('*** mindedge ***')
     return
     try:
@@ -9,7 +9,7 @@ def handle_mindedge_enrollment(erp, profile, data, message_data, enrollment):
             external_entity__entity_name__iexact=erp
         )
     except StoreConfiguration.DoesNotExist:
-        save_to_mongo(data={'type': 'erp', 'comment': erp + ' not implemented'},
+        save_to_mongo(data={'type': 'erp', 'comment': 'Configuration not found'},
                       collection='enrollment_status_history')
         return 1
 

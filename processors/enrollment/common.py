@@ -6,48 +6,45 @@ from .payments import payment_transaction
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import CourseEnrollment, CertificateEnrollment, LMSAccess, PaymentRefund, Certificate, Course, StoreConfiguration
+from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway
 from .mindedge import handle_mindedge_enrollment
 from .j1 import handle_j1_enrollment
 
 def enroll(enrollment_data):
-    for data in enrollment_data:
-        if data['erp'] == 'none' or data['erp'] == 'mindedge':
-            for message_data in data['data']:
-                enrollment = message_data.pop('course_enrollment', None)
-                if enrollment:
-                    enrollment.status = 'pending'
-                    enrollment.save()
-                else:
-                    return 1
+    payment = enrollment_data['payment']
 
+    for item in enrollment_data['erp_list']:
+        if item['erp'] == 'mindedge':
+            for message_data in item['data']:
                 try:
-                    erp = message_data['erp']
                     profile = message_data['profile']
                     erp_data = message_data['data']
-                    action = message_data['action']
-                    payment = message_data.pop('payment')
-                    store_payment_gateway = message_data.pop('store_payment_gateway')
+                    handle_mindedge_enrollment(profile, erp_data, message_data, enrollment)
                 except KeyError:
                     save_to_mongo(data={'type': 'erp', 'comment': 'unknown data format'},
                                 collection='enrollment_status_history')
-                    return 1
+                    continue
+        elif item['erp'] == 'j1':
+            cart = payment.cart
+            cart.enrollment_request = item['data']
+            cart.save()
 
-                if message_data['erp'] == 'none':
-                    enrollment.status = 'success'
+            handle_j1_enrollment(item['data'])
+        else:
+            for message_data in item['data']:
+                enrollment = message_data.pop('course_enrollment', None)
+                if enrollment:
+                    enrollment.status = CourseEnrollment.STATUS_SUCCESS
                     enrollment.save()
-                    print('erp none')
-
-                if message_data['erp'] == 'mindedge':
-                    handle_mindedge_enrollment(erp, profile, erp_data, message_data, enrollment)
-
-        if data['erp'] == 'j1':
-            payment = data['data'].pop('payment_obj', None)
-            store_payment_gateway = data['data'].pop('store_payment_gateway_obj', None)
-            handle_j1_enrollment(data['data'])
+                else:
+                    continue
 
     if payment.amount > 0.0:
-        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+        try:
+            store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
+            payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+        except StorePaymentGateway.DoesNotExist:
+            pass
 
 
 def unenroll(data):
