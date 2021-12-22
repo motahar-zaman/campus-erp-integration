@@ -279,7 +279,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                     store_course, created = StoreCourse.objects.get_or_create(
                         course=course,
                         store=contract.store,
-                        defaults={'is_published': True, 'enrollment_ready': True}
+                        defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
 
 def publish(doc_id):
