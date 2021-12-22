@@ -76,18 +76,19 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     else:
         write_status(doc, section_model_serializer.errors)
         return
-
-    for sec_data in course_model.sections:
-        if sec_data['external_id'] == section_model_serializer.data['external_id']:
-            CourseModel.objects(id=course_model.id).update_one(pull__sections__external_id=sec_data['external_id'])
-            new_section_data = sec_data.to_mongo().to_dict()
-            new_section_data.update(section_model_serializer.data)
+    if course_model.sections:
+        for section_idx, sec_data in enumerate(course_model.sections):
+            if sec_data['external_id'] == section_model_serializer.data['external_id']:
+                new_section_data = sec_data.to_mongo().to_dict()
+                new_section_data.update(section_model_serializer.data)
+                course_model.sections[section_idx] = SectionModel(**new_section_data)
+                course_model.save()
+                break
         else:
-            new_section_data = section_model_serializer.data
-        CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=new_section_data)
-    if not course_model.sections:
+            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+    else:
         CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-
+    course_model.reload()
     section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
     with scopes_disabled():
         try:
@@ -175,22 +176,21 @@ def create_schedules(doc, data, course_provider_model):
         write_status(doc, schedule_serializer.errors)
         return
 
-    for section in course_model.sections:
+    for section_idx, section in enumerate(course_model.sections):
         if section['external_id'] == data['parent']:
             serializer = CheckSectionModelValidationSerializer(section)
             if serializer.data['schedules']:
-                for idx, schedule in enumerate(serializer.data['schedules']):
-
+                for schedule_idx, schedule in enumerate(serializer.data['schedules']):
                     if schedule['external_id'] == data['data']['external_id']:
-                        serializer.data['schedules'][idx].update(schedule_serializer.data)
+                        serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
                     else:
                         serializer.data['schedules'].append(schedule_serializer.data)
             else:
                 serializer.data['schedules'].append(schedule_serializer.data)
-            CourseModel.objects(
-                id=course_model.id,
-                sections__code=section['code'],
-            ).update_one(set__sections__S=SectionModel(**serializer.data))
+
+            course_model.sections[section_idx] = SectionModel(**serializer.data)
+            course_model.save()
+            break
 
 def create_instructors(doc, data, course_provider_model):
     try:
@@ -215,16 +215,6 @@ def create_instructors(doc, data, course_provider_model):
 
     for section in course_model.sections:
         if section['external_id'] == data['parent']:
-            # CourseModel.objects(id=course_model.id).update_one(pull__sections__external_id=section['external_id'])
-            # new_section_data = section.to_mongo().to_dict()
-
-            # if instructor_model.id in new_section_data['instructors']:
-            #     pass
-            # else:
-            #     new_section_data['instructors'].append(instructor_model.id)
-            # CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=new_section_data)
-            # break
-
             if instructor_model.id not in section['instructors']:
                 serializer = CheckSectionModelValidationSerializer(section)
                 serializer.data['instructors'].append(instructor_model.id)
@@ -325,9 +315,14 @@ def publish(doc_id):
         # we will assume that their parents exist in db. if does not exist, we will just skip
         create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
 
+        # since schedules and instructors are embedded into sections, we will create sections first
+
         for item in records:
             if item['type'] == 'section':
                 create_sections(doc, item, course_provider, course_provider_model, contracts=contracts)
+
+        # then rest of the stuff
+        for item in records:
             if item['type'] == 'schedule':
                 create_schedules(doc, item, course_provider_model)
             if item['type'] == 'instructor':
