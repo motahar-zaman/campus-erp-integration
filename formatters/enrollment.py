@@ -1,49 +1,165 @@
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import Payment, CourseEnrollment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
+from shared_models.models import Payment, QuestionBank, StudentProfile, Cart, CourseEnrollment, PaymentRefund, CartItem, StoreCertificate, StoreCourseSection, Profile, StorePaymentGateway
 from django_scopes import scopes_disabled
+from django.core.exceptions import ValidationError
 
 
 class EnrollmentFormatter(object):
-    def enroll(self, payload):
-        try:
-            profile = Profile.objects.get(id=payload['profile_id'])
-        except Profile.DoesNotExist:
-            return {}
-        
+    def mindedge(self, profile, external_id, course_enrollment, payment, payload):
         with scopes_disabled():
-            try:
-                payment = Payment.objects.get(id=payload['payment_id'])
-            except Payment.DoesNotExist:
-                return {}
-
             try:
                 store_payment_gateway = StorePaymentGateway.objects.get(id=payload['store_payment_gateway_id'])
             except StorePaymentGateway.DoesNotExist:
-                return {}
-            
-            try:
-                course_enrollment = CourseEnrollment.objects.get(id=payload['course_enrollment_id'])
-            except CourseEnrollment.DoesNotExist:
-                return {}
+                store_payment_gateway = None
 
-        data = {
+        return {
             'data': {
-                'cid': payload['external_id'],
-                'login_link': payload['enrollment_login_link']
+                'cid': external_id,
+                'login_link': True
             },
-            'erp': 'none',
             'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
             'action': 'enroll',
             'enrollment_type': 'course',
-            'enrollment_id': payload['course_enrollment_id'],
+            'enrollment_id': str(course_enrollment.id),
+            'course_enrollment': course_enrollment,
             'cart_id': payload['cart_id'],
             'payment': payment,
             'store_payment_gateway': store_payment_gateway
         }
-        
-        return data
+
+    def j1(self, profile, external_id, course_enrollment, payment):
+        registration_details = {}
+        reg_info = {}
+        # getting registration info
+        for reg_detail in payment.cart.registration_details:
+            try:
+                if profile.primary_email == reg_detail['student'] and str(course_enrollment.cart_item.product.id) == reg_detail['product_id']:
+                    reg_info = reg_detail['data']
+            except KeyError:
+                reg_info = {}
+
+        for key, val in reg_info.items():
+            try:
+                question = QuestionBank.objects.get(id=key)
+            except (QuestionBank.DoesNotExist, ValidationError):
+                continue
+            registration_details[question.external_id] = val
+
+        # getting student id
+        school_student_id = ''
+        student_profiles = StudentProfile.objects.filter(profile=profile)
+        if student_profiles.exists():
+            school_student_id = student_profiles.first().external_id
+
+        # getting profile info
+        extra_info = {}
+        profile_details = {}
+
+        for profile_data in payment.cart.student_details:
+            try:
+                if profile.primary_email == profile_data['email'] and str(course_enrollment.cart_item.product.id) == profile_data['product_id']:
+                    extra_info = profile_data['extra_info']
+            except KeyError:
+                extra_info = {}
+
+        for key, val in extra_info.items():
+            try:
+                question = QuestionBank.objects.get(id=key)
+            except (QuestionBank.DoesNotExist, ValidationError):
+                continue
+            profile_details[question.external_id] = val
+
+        return {
+            'external_id': external_id,
+            'enrollment_id': str(course_enrollment.ref_id),
+            'product_type': 'section',
+            'registration_details': registration_details,
+            'student': {
+                'school_student_id': school_student_id,
+                'email': profile.primary_email,
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'profile_details': profile_details,
+            },
+        }
+
+    def enroll(self, payload):
+        mindedge_data = []
+        common_data = []
+        j1_data = {
+            'enrollments': []
+        }
+
+        payment = None
+        try:
+            with scopes_disabled():
+                payment = Payment.objects.get(id=payload['payment_id'])
+                
+            for profile_id, external_id, enrollment_id in zip(payload['profile_id'], payload['external_id'], payload['course_enrollment_id']):
+                with scopes_disabled():
+                    try:
+                        profile = Profile.objects.get(id=profile_id)
+                    except Profile.DoesNotExist:
+                        continue
+
+                    try:
+                        course_enrollment = CourseEnrollment.objects.get(id=enrollment_id)
+                        course_enrollment.status = CourseEnrollment.STATUS_PENDING
+                        course_enrollment.save()
+                    except CourseEnrollment.DoesNotExist:
+                        continue
+                
+                if course_enrollment.course.course_provider.code == 'mindedge':
+                    mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
+                elif course_enrollment.course.course_provider.code == 'j1':
+                    j1_data['order_id'] = str(payment.cart.ref_id)
+                    j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    j1_data['payment'] = {
+                        'amount': str(payment.amount),
+                        'currency_code': payment.currency_code,
+                        'transaction_reference': payment.transaction_reference,
+                        'auth_code': payment.auth_code,
+                        'payment_type': payment.payment_type,
+                        'bank': payment.bank,
+                        'account_number': payment.account_number,
+                        'card_type': payment.card_type,
+                        'card_number': payment.card_number,
+                        'reason_code': payment.reason_code,
+                        'reason_description': payment.reason_description,
+                        'customer_ip': payment.customer_ip,
+                        'status': payment.status,
+                        'transaction_time': str(payment.transaction_time),
+                    },
+                    agreement_details = {}
+                    for key, val in payment.cart.agreement_details.items():
+                        try:
+                            question = QuestionBank.objects.get(id=key)
+                        except (QuestionBank.DoesNotExist, ValidationError):
+                            continue
+                        agreement_details[question.external_id] = val
+                    j1_data['agreement_details'] = agreement_details
+                else:
+                    common_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
+        except Payment.DoesNotExist:
+            pass
+
+        return {
+            'erp_list':[{
+                'erp': 'mindedge',
+                'data': mindedge_data
+            }, {
+                'erp': 'j1',
+                'data': j1_data
+            }, {
+                'erp': 'none',
+                'data': common_data
+            }],
+            'payment': payment,
+            'store_payment_gateway_id': payload['store_payment_gateway_id']
+        }
+
 
     def unenroll(self, payload):
         with scopes_disabled():

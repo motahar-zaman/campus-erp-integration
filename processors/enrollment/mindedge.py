@@ -1,114 +1,49 @@
-from django.core.mail import send_mail
 from services.mindedge import MindEdgeService
-from decouple import config
-from loggers.mongo import save_status_to_mongo
-from django_scopes import scopes_disabled
-from .payments import payment_transaction
-from django_initializer import initialize_django
-initialize_django()
 
-from shared_models.models import CourseEnrollment, CertificateEnrollment, LMSAccess, PaymentRefund, Certificate, Course, StoreConfiguration
-
-
-def get_erp_config(erp, store):
-    erp_config = {}
-
+def handle_mindedge_enrollment(profile, data, message_data, enrollment):
+    print('*** mindedge ***')
+    return
     try:
         store_configuration = store.store_configurations.get(
             external_entity__entity_type='enrollment_config',
             external_entity__entity_name__iexact=erp
         )
     except StoreConfiguration.DoesNotExist:
-        save_status_to_mongo(status_data={'comment': erp + ' not implemented'})
+        save_to_mongo(data={'type': 'erp', 'comment': 'Configuration not found'},
+                      collection='enrollment_status_history')
         return 1
 
-    erp_config['processor_class'] = MindEdgeService
-    erp_config['credentials'] = store_configuration.config_value
-
-    return erp_config
-
-
-def enroll(message_data):
-    if message_data['enrollment_type'] == 'course':
-        enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
-        enrollment.status = CourseEnrollment.STATUS_PENDING
-
-    else:
-        enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
-        enrollment.status = CertificateEnrollment.STATUS_PENDING
-
-    try:
-        erp = message_data['erp']
-        profile = message_data['profile']
-        data = message_data['data']
-        action = message_data['action']
-        payment = message_data.pop('payment')
-        store_payment_gateway = message_data.pop('store_payment_gateway')
-    except KeyError:
-        save_status_to_mongo(status_data={'comment': 'unknown data format'})
-        return 1
-
-    if erp == 'none':
-        if message_data['enrollment_type'] == 'course':
-            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CourseEnrollment.STATUS_SUCCESS
-        else:
-            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CertificateEnrollment.STATUS_SUCCESS
-        
-        enrollment.save()
-        payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
-        return 1
-
-    erp_config = get_erp_config(erp, store_payment_gateway.store)
-
-    processor_class = erp_config['processor_class']
-    credentials = erp_config['credentials']
+    processor_class = MindEdgeService
+    credentials = store_configuration.config_value
 
     processor_obj = processor_class(credentials, profile, data)
 
     if not processor_obj.authenticate():
-        if message_data['enrollment_type'] == 'course':
-            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CourseEnrollment.STATUS_FAILED
-
-        else:
-            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CertificateEnrollment.STATUS_FAILED
-
+        enrollment.status = 'failed'
         enrollment.save()
-        status_data = {'comment': 'authentication_failed', 'data': credentials}
+        status_data = {'type': 'erp', 'comment': 'authentication_failed', 'data': credentials}
 
         payment_transaction(payment, store_payment_gateway, 'voidTransaction')
-        save_status_to_mongo(status_data=status_data)
-        return 0
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
+        return 'auth_failed'
 
-    status_data = {'comment': 'erp_authenticated', 'data': credentials}
-    save_status_to_mongo(status_data=status_data)
+    status_data = {'type': 'erp', 'comment': 'erp_authenticated', 'data': credentials}
+    save_to_mongo(data=status_data, collection='enrollment_status_history')
     action = getattr(processor_obj, action)
     resp = action()
 
     if resp['status'] == 'fail' and not resp['already_enrolled']:
-        status_data = {'comment': 'failed', 'data': resp}
-
         payment_transaction(payment, store_payment_gateway, 'voidTransaction')
-        save_status_to_mongo(status_data=status_data)
+        enrollment.status = 'failed'
+        enrollment.save()
+        status_data = {'type': 'erp', 'comment': 'enrollment_failed', 'data': credentials}
+        return 'enrollment_failed'
 
-        if message_data['enrollment_type'] == 'course':
-            enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CourseEnrollment.STATUS_FAILED
+    status_data = {'type': 'erp', 'comment': 'enrolled', 'data': resp}
+    save_to_mongo(data=status_data, collection='enrollment_status_history')
 
-        else:
-            enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
-            enrollment.status = CertificateEnrollment.STATUS_FAILED
-        return 0
-
-    status_data = {'comment': 'enrolled', 'data': resp}
-    save_status_to_mongo(status_data=status_data)
-
+    # handle already enrolled issue
     if message_data['enrollment_type'] == 'course':
-        enrollment = CourseEnrollment.objects.get(id=message_data['enrollment_id'])
-
         already_enrolled = False
         try:
             already_enrolled = resp['already_enrolled']
@@ -128,10 +63,10 @@ def enroll(message_data):
                 enrollment.delete()
                 enrollment = old_enrollment
 
-        enrollment.status = CourseEnrollment.STATUS_SUCCESS
+        enrollment.status = 'success'
 
-        status_data = {'comment': 'lms_created'}
-        save_status_to_mongo(status_data=status_data)
+        status_data = {'type': 'erp', 'comment': 'lms_created'}
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
 
         LMSAccess.objects.update_or_create(
             course_enrollment=enrollment,
@@ -140,62 +75,10 @@ def enroll(message_data):
                 'lms_access_details': resp,
             }
         )
-        #########################################
-        # initiate payment capture              #
-        #########################################
+        return 'success'
         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
     else:
-        print('enrollment successful')
-        enrollment = CertificateEnrollment.objects.get(id=message_data['enrollment_id'])
-        enrollment.status = CertificateEnrollment.STATUS_SUCCESS
-
+        # this enrollment is a certificate
+        # this is not well implemented
+        enrollment.status = 'success'
     enrollment.save()
-
-
-def unenroll(data):
-    with scopes_disabled():
-        refund = PaymentRefund.objects.get(id=data['refund_id'])
-    student_name = data['student_name']
-    student_email = data['student_email']
-    certificate_id = data['certificate']
-    course_id = data['course']
-
-    subject = 'Enrollment cancellation request'
-    message = f'Student name: {student_name}\nEmail: {student_email}'
-
-    recipients = []
-
-    if certificate_id != '':
-        message = f'{message}\nCertificate: {certificate_id}'
-        with scopes_disabled():
-            certificate = Certificate.objects.get(id=certificate_id)
-
-        if certificate.course_provider.refund_email is not None:
-            recipients.append(certificate.course_provider.refund_email)
-
-    if course_id != '':
-        message = f'{message}\nCourse: {course_id}'
-        with scopes_disabled():
-            course = Course.objects.get(id=course_id)
-
-        if course.course_provider.refund_email is not None:
-            recipients.append(course.course_provider.refund_email)
-
-    if len(recipients):
-        try:
-            from django.conf import settings
-            settings.EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-            settings.EMAIL_HOST = config('SMTP_HOST')
-            settings.EMAIL_USE_TLS = config('SMTP_USE_TLS', cast=bool)
-            settings.EMAIL_PORT = config('SMTP_PORT', cast=int)
-            settings.EMAIL_HOST_USER = config('SMTP_HOST_USER')
-            settings.EMAIL_HOST_PASSWORD = config('SMTP_HOST_PASSWORD')
-            send_mail(subject, message, config('SMTP_HOST_USER'), recipients, fail_silently=False)
-        except Exception as e:
-            refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
-        else:
-            refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_DONE
-    else:
-        refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
-    refund.save()
-    return refund
