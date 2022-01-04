@@ -131,7 +131,7 @@ class EnrollmentFormatter(object):
                         'customer_ip': payment.customer_ip,
                         'status': payment.status,
                         'transaction_time': str(payment.transaction_time),
-                    },
+                    }
                     agreement_details = {}
                     for key, val in payment.cart.agreement_details.items():
                         try:
