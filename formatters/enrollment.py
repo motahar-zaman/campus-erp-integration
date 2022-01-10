@@ -51,7 +51,7 @@ class EnrollmentFormatter(object):
         school_student_id = ''
         student_profiles = StudentProfile.objects.filter(profile=profile)
         if student_profiles.exists():
-            school_student_id = student_profiles.first().external_id
+            school_student_id = student_profiles.first().external_profile_id
 
         # getting profile info
         extra_info = {}
@@ -96,7 +96,7 @@ class EnrollmentFormatter(object):
         try:
             with scopes_disabled():
                 payment = Payment.objects.get(id=payload['payment_id'])
-                
+
             for profile_id, external_id, enrollment_id in zip(payload['profile_id'], payload['external_id'], payload['course_enrollment_id']):
                 with scopes_disabled():
                     try:
@@ -110,7 +110,7 @@ class EnrollmentFormatter(object):
                         course_enrollment.save()
                     except CourseEnrollment.DoesNotExist:
                         continue
-                
+
                 if course_enrollment.course.course_provider.code == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
                 elif course_enrollment.course.course_provider.code == 'j1':
