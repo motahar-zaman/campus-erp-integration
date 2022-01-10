@@ -28,7 +28,6 @@ def enroll(enrollment_data):
             cart = payment.cart
             cart.enrollment_request = item['data']
             cart.save()
-
             handle_j1_enrollment(item['data'])
         else:
             for message_data in item['data']:
