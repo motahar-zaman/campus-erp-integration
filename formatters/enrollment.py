@@ -106,10 +106,11 @@ class EnrollmentFormatter(object):
 
                     try:
                         course_enrollment = CourseEnrollment.objects.get(id=enrollment_id)
-                        course_enrollment.status = CourseEnrollment.STATUS_PENDING
-                        course_enrollment.save()
                     except CourseEnrollment.DoesNotExist:
                         continue
+                    else:
+                        course_enrollment.status = CourseEnrollment.STATUS_PENDING
+                        course_enrollment.save()
 
                 if course_enrollment.course.course_provider.code == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
