@@ -49,9 +49,9 @@ class EnrollmentFormatter(object):
 
         # getting student id
         school_student_id = ''
-        # student_profiles = StudentProfile.objects.filter(profile=profile)
-        # if student_profiles.exists():
-        #     school_student_id = student_profiles.first().external_profile_id
+        student_profiles = StudentProfile.objects.filter(profile=profile)
+        if student_profiles.exists():
+            school_student_id = student_profiles.first().external_profile_id
 
         # getting profile info
         extra_info = {}
