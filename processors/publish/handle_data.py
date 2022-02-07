@@ -126,7 +126,8 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                         product_type='section',
                         title=course.title,
                         tax_code='ST080031',
-                        fee=section.fee
+                        fee=section.fee,
+                        product_fee=section.fee
                     )
 
                     store_course_section, created = StoreCourseSection.objects.get_or_create(
@@ -144,6 +145,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.title = course.title
                     product.tax_code = 'ST080031'
                     product.fee = section.fee
+                    product.product_fee = section.fee
 
                     product.save()
 
