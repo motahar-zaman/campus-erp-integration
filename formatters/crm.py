@@ -162,11 +162,11 @@ class CRMFormatter(object):
                 },
                 {
                     'name': 'extended_amount',
-                    'value': float(cart.extended_amount)
+                    'value': float(cart.gross_amount)
                 },
                 {
                     'name': 'discount_amount',
-                    'value': float(cart.discount_amount)
+                    'value': float(cart.total_discount)
                 },
                 {
                     'name': 'sales_tax',
