@@ -176,10 +176,10 @@ class CRMFormatter(object):
                     'name': 'total_amount',
                     'value': float(cart.total_amount)
                 },
-                {
-                    'name': 'coupon_code',
-                    'value': cart.coupon.code if cart.coupon else ''
-                },
+                # {
+                #     'name': 'coupon_code',
+                #     'value': cart.coupon.code if cart.coupon else ''
+                # },
                 {
                     'name': 'transaction_reference',
                     'value': str(payment.auth_code) if payment else ''
