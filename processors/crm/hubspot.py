@@ -99,7 +99,4 @@ def add_or_update_product(data):
                     refund.task_crm_update = PaymentRefund.TASK_STATUS_DONE
                     refund.save()
                     break
-    print('----------crm response------------')
-    print(resp.json())
-    print('----------------------------------')
     return resp.status_code

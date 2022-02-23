@@ -11,6 +11,9 @@ from .mindedge import handle_mindedge_enrollment
 from .j1 import handle_j1_enrollment
 
 def enroll(enrollment_data):
+    print('-----------------------------------------')
+    print(enrollment_data)
+    print('-----------------------------------------')
     payment = enrollment_data['payment']
 
     for item in enrollment_data['erp_list']:
@@ -26,9 +29,11 @@ def enroll(enrollment_data):
                     continue
         elif item['erp'] == 'j1':
             cart = payment.cart
-            cart.enrollment_request = item['data']
+            cart.enrollment_request = {'request': item['data']}
             cart.save()
-            handle_j1_enrollment(item['data'])
+            resp = handle_j1_enrollment(item['data'])
+            cart.enrollment_request['response'] = resp
+            cart.save()
         else:
             for message_data in item['data']:
                 enrollment = message_data.pop('course_enrollment', None)
