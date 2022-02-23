@@ -11,9 +11,6 @@ from .mindedge import handle_mindedge_enrollment
 from .j1 import handle_j1_enrollment
 
 def enroll(enrollment_data):
-    print('-----------------------------------------')
-    print(enrollment_data)
-    print('-----------------------------------------')
     payment = enrollment_data['payment']
 
     for item in enrollment_data['erp_list']:

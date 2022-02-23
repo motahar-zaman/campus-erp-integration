@@ -86,6 +86,9 @@ class EnrollmentFormatter(object):
         }
 
     def enroll(self, payload):
+        print('------------------------------------')
+        print(payload)
+        print('------------------------------------')
         mindedge_data = []
         common_data = []
         j1_data = {
