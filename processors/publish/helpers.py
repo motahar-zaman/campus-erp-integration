@@ -261,3 +261,38 @@ def transale_j1_data(request_data):
         else:
             data[key] = request_data[value]
     return data
+
+
+def upsert_mongo_doc(collection=None, query=None, data=None):
+    db = get_db()
+    coll = db[collection]
+    doc = coll.find_one(query)
+    if doc is None:
+        result = coll.insert_one(data)
+        return result.inserted_id
+    else:
+        if collection == 'course':
+            old_section_codes = [section['code'] for section in doc['sections']]
+            new_section_codes = [section['code'] for section in data['sections']]
+            sections = []
+
+            for section in data['sections']:
+                if section['code'] not in old_section_codes:
+                    # this is new
+                    sections.append(section)
+                else:
+                    # this is present in the old sections. so has to update
+                    for old_section in doc['sections']:
+                        if old_section['code'] == section['code']:
+                            old_section.update(section)
+                            sections.append(old_section)
+            for section in doc['sections']:
+                if section['code'] not in new_section_codes:
+                    # this will not be updated. will remain as is.
+                    sections.append(section)
+            data['sections'] = sections
+        if collection not in ['course_provider_site', 'instructor']:
+            result = db.course.update_one(query, {'$set': data}, upsert=True)
+
+        return doc['_id']
+    return None
