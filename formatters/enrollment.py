@@ -86,6 +86,9 @@ class EnrollmentFormatter(object):
         }
 
     def enroll(self, payload):
+        print('------------------------------------')
+        print(payload)
+        print('------------------------------------')
         mindedge_data = []
         common_data = []
         j1_data = {
@@ -115,7 +118,7 @@ class EnrollmentFormatter(object):
                 if course_enrollment.course.course_provider.code == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
                 elif course_enrollment.course.course_provider.code == 'j1':
-                    j1_data['order_id'] = str(payment.cart.ref_id)
+                    j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
                     j1_data['payment'] = {
                         'amount': str(payment.amount),

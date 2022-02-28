@@ -162,11 +162,11 @@ class CRMFormatter(object):
                 },
                 {
                     'name': 'extended_amount',
-                    'value': float(cart.extended_amount)
+                    'value': float(cart.gross_amount)
                 },
                 {
                     'name': 'discount_amount',
-                    'value': float(cart.discount_amount)
+                    'value': float(cart.total_discount)
                 },
                 {
                     'name': 'sales_tax',
@@ -176,10 +176,10 @@ class CRMFormatter(object):
                     'name': 'total_amount',
                     'value': float(cart.total_amount)
                 },
-                {
-                    'name': 'coupon_code',
-                    'value': cart.coupon.code if cart.coupon else ''
-                },
+                # {
+                #     'name': 'coupon_code',
+                #     'value': cart.coupon.code if cart.coupon else ''
+                # },
                 {
                     'name': 'transaction_reference',
                     'value': str(payment.auth_code) if payment else ''

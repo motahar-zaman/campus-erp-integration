@@ -26,6 +26,7 @@ def enroll_callback(ch, method, properties, body):
         print('* Enrolling')
         formatter = EnrollmentFormatter()
         data = formatter.enroll(payload)
+        print('enrollment data formatted')
         enroll(data)
         print('Done')
 
