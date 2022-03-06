@@ -40,12 +40,12 @@ def enroll(enrollment_data):
                 else:
                     continue
 
-    if payment.amount > 0.0:
-        try:
-            store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
-            payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
-        except StorePaymentGateway.DoesNotExist:
-            pass
+    # if payment.amount > 0.0:
+    #     try:
+    #         store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
+    #         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+    #     except StorePaymentGateway.DoesNotExist:
+    #         pass
 
 
 def unenroll(data):
