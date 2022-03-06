@@ -247,7 +247,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                 course_model = course_model_serializer.save()
             else:
                 write_status(doc, course_model_serializer.errors)
-                return
+                return false
             write_status(doc, 'course saved in mongodb. trying to get data formatted for postgres.')
             course_data = prepare_course_postgres(course_model, course_provider)
             write_status(doc, course_data)
@@ -264,7 +264,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                     course = course_serializer.save()
                 else:
                     write_status(doc, course_serializer.errors)
-                    return
+                    return false
 
                 # create StoreCourse
                 for contract in contracts:
@@ -273,6 +273,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         store=contract.store,
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
+    return true
 
 def publish(doc_id):
     doc = get_data(doc_id, collection='publish_job')
@@ -315,7 +316,10 @@ def publish(doc_id):
 
         # later on, when creating sections, instructors or schedules
         # we will assume that their parents exist in db. if does not exist, we will just skip
-        create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
+        course = create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
+
+        if not course:
+            return false
 
         # since schedules and instructors are embedded into sections, we will create sections first
 
