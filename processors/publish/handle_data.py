@@ -10,7 +10,9 @@ from .helpers import (
     prepare_section_mongo,
     prepare_section_postgres,
     transale_j1_data,
-    write_status
+    write_status,
+    insert_into_mongo,
+    get_data
 )
 
 from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer
@@ -30,18 +32,18 @@ import decimal
 
 from django_scopes import scopes_disabled
 
-def get_data(doc_id, collection):
-    db = get_db()
-    coll = db[collection]
-    doc = coll.find_one({'_id': ObjectId(doc_id)})
-    return doc
-
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
+    # insert every item in mongo to get status individually
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+
+    inserted_item = get_data(inserted_id, collection='queue_item')
+
     try:
         course_model = CourseModel.objects.get(external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_status(doc, 'invalid parent in section')
+        write_status(inserted_item, 'invalid parent in section', collection='queue_item')
         return
 
     try:
@@ -66,7 +68,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
             course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
         except Course.DoesNotExist:
             # without that we can not proceed comfortably
-            write_status(doc, 'postgres does not have a corresponding course')
+            write_status(inserted_item, 'postgres does not have a corresponding course', collection='queue_item')
             return
     # now update the sections in mongo
 
@@ -74,7 +76,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     if section_model_serializer.is_valid():
         pass
     else:
-        write_status(doc, section_model_serializer.errors)
+        write_status(inserted_item, section_model_serializer.errors, collection='queue_item')
         return
     if course_model.sections:
         for section_idx, sec_data in enumerate(course_model.sections):
@@ -100,8 +102,9 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
 
         if serializer.is_valid():
             section = serializer.save()
+            write_status(inserted_item, 'section created', collection='queue_item')
         else:
-            write_status(doc, serializer.errors)
+            write_status(inserted_item, serializer.errors, collection='queue_item')
             return
 
     # now, we find store courses, utilizing contracts.
@@ -148,18 +151,26 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.product_fee = section.fee
 
                     product.save()
+    write_status(inserted_item, 'section and product created', collection='queue_item')
+
 
 def create_schedules(doc, data, course_provider_model):
+    # insert every item in mongo to get status individually
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+
+    inserted_item = get_data(inserted_id, collection='queue_item')
+
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_status(doc, 'invalid parent in schedule')
+        write_status(inserted_item, 'invalid parent in schedule', collection='queue_item')
         return
 
     except CourseModel.MultipleObjectsReturned:
         # without that we can not proceed comfortably
-        write_status(doc, 'many sections with the same external_id')
+        write_status(inserted_item, 'many sections with the same external_id', collection='queue_item')
         return
 
     try:
@@ -175,7 +186,7 @@ def create_schedules(doc, data, course_provider_model):
     # check if the provided data is valid. if not, abort.
     schedule_serializer = SectionScheduleModelSerializer(data=data['data'])
     if not schedule_serializer.is_valid():
-        write_status(doc, schedule_serializer.errors)
+        write_status(inserted_item, schedule_serializer.errors, collection='queue_item')
         return
 
     for section_idx, section in enumerate(course_model.sections):
@@ -192,14 +203,21 @@ def create_schedules(doc, data, course_provider_model):
 
             course_model.sections[section_idx] = SectionModel(**serializer.data)
             course_model.save()
+            write_status(inserted_item, 'schedule created', collection='queue_item')
             break
 
 def create_instructors(doc, data, course_provider_model):
+    # insert every item in mongo to get status individually
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+
+    inserted_item = get_data(inserted_id, collection='queue_item')
+
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_status(doc, 'invalid parent in instructor')
+        write_status(inserted_item, 'invalid parent in instructor', collection='queue_item')
         return
     data['data']['provider'] = course_provider_model.id
     try:
@@ -211,8 +229,9 @@ def create_instructors(doc, data, course_provider_model):
 
     if instructor_model_serializer.is_valid():
         instructor_model = instructor_model_serializer.save()
+        write_status(inserted_item, 'instructor updated', collection='queue_item')
     else:
-        write_status(doc, instructor_model_serializer.errors)
+        write_status(inserted_item, instructor_model_serializer.errors, collection='queue_item')
         return
 
     for section in course_model.sections:
@@ -224,11 +243,18 @@ def create_instructors(doc, data, course_provider_model):
                     id=course_model.id,
                     sections__external_id=data['parent'],
                 ).update_one(set__sections__S=SectionModel(**serializer.data))
+    write_status(inserted_item, 'instructor created and updated', collection='queue_item')
 
 def create_courses(doc, course_provider, course_provider_model, records, contracts=[]):
     for item in records:
         if item['type'] == 'course':
-            write_status(doc, 'course type item found')
+            # insert every item in mongo to get status individually
+            mongo_data = {'data': item, 'job_id': doc['_id'], 'status': 'pending'}
+            inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+
+            inserted_item = get_data(inserted_id, collection='queue_item')
+
+            write_status(inserted_item, 'course type item found', collection='queue_item')
             data = item['data']
             level = data.get('level', None)
             if level not in ['beginner', 'intermediate', 'advanced']:
@@ -246,11 +272,11 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             if course_model_serializer.is_valid():
                 course_model = course_model_serializer.save()
             else:
-                write_status(doc, course_model_serializer.errors)
-                return false
-            write_status(doc, 'course saved in mongodb. trying to get data formatted for postgres.')
+                write_status(inserted_item, course_model_serializer.errors, collection='queue_item')
+                return False
+            write_status(inserted_item, 'course saved in mongodb. trying to get data formatted for postgres.', collection='queue_item')
             course_data = prepare_course_postgres(course_model, course_provider)
-            write_status(doc, course_data)
+            write_status(inserted_item, 'prepare course for postgres', collection='queue_item')
 
             with scopes_disabled():
                 try:
@@ -262,9 +288,10 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 
                 if course_serializer.is_valid():
                     course = course_serializer.save()
+                    write_status(inserted_item, 'course created in postgres', collection='queue_item')
                 else:
-                    write_status(doc, course_serializer.errors)
-                    return false
+                    write_status(inserted_item, course_serializer.errors, collection='queue_item')
+                    return False
 
                 # create StoreCourse
                 for contract in contracts:
@@ -273,10 +300,15 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         store=contract.store,
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
-    return true
+                write_status(inserted_item, 'course and store_course created in postgres', collection='queue_item')
+    write_status(doc, 'course creation is completed')
+
+    return True
+
 
 def publish(doc_id):
     doc = get_data(doc_id, collection='publish_job')
+    print(doc['_id'])
     if doc:
         write_status(doc, 'request received')
         try:
@@ -289,19 +321,19 @@ def publish(doc_id):
             course_provider = CourseProvider.objects.get(id=course_provider_id)
         except CourseProvider.DoesNotExist:
             write_status(doc, 'course provider not found')
-            return
+            return False
 
         try:
             course_provider_model_id = doc['course_provider_model_id']
         except KeyError:
             write_status(doc, 'key course_provider_model_id does not exist in data')
-            return
+            return False
 
         try:
             course_provider_model = CourseProviderModel.objects.get(id=course_provider_model_id)
         except CourseProvider.DoesNotExist:
             write_status(doc, 'course provider model not found')
-            return
+            return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
         if contracts.count() > 0:
@@ -310,22 +342,19 @@ def publish(doc_id):
             records = doc['payload']['records']
         except KeyError:
             write_status(doc, 'payload does not contain any records')
-            return
+            return False
         # create courses first
         # because without courses everything else will not exist
 
         # later on, when creating sections, instructors or schedules
         # we will assume that their parents exist in db. if does not exist, we will just skip
-        course = create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
-
-        if not course:
-            return false
-
+        create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
         # since schedules and instructors are embedded into sections, we will create sections first
 
         for item in records:
             if item['type'] == 'section':
                 create_sections(doc, item, course_provider, course_provider_model, contracts=contracts)
+        write_status(doc, 'section creation is completed')
 
         # then rest of the stuff
         for item in records:
