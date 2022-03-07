@@ -29,12 +29,14 @@ from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
 from datetime import datetime
 import decimal
+from datetime import datetime
 
 from django_scopes import scopes_disabled
 
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
-    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': [{'message': 'pending', 'time': current_time}]}
     inserted_id = insert_into_mongo(mongo_data, 'queue_item')
 
     inserted_item = get_data(inserted_id, collection='queue_item')
@@ -156,7 +158,8 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
 
 def create_schedules(doc, data, course_provider_model):
     # insert every item in mongo to get status individually
-    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': [{'message': 'pending', 'time': current_time}]}
     inserted_id = insert_into_mongo(mongo_data, 'queue_item')
 
     inserted_item = get_data(inserted_id, collection='queue_item')
@@ -208,7 +211,8 @@ def create_schedules(doc, data, course_provider_model):
 
 def create_instructors(doc, data, course_provider_model):
     # insert every item in mongo to get status individually
-    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'pending'}
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': [{'message': 'pending', 'time': current_time}]}
     inserted_id = insert_into_mongo(mongo_data, 'queue_item')
 
     inserted_item = get_data(inserted_id, collection='queue_item')
@@ -249,7 +253,8 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
     for item in records:
         if item['type'] == 'course':
             # insert every item in mongo to get status individually
-            mongo_data = {'data': item, 'job_id': doc['_id'], 'status': 'pending'}
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            mongo_data = {'data': item, 'job_id': doc['_id'], 'status': [{'message': 'pending', 'time': current_time}]}
             inserted_id = insert_into_mongo(mongo_data, 'queue_item')
 
             inserted_item = get_data(inserted_id, collection='queue_item')
