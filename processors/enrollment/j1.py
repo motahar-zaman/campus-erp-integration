@@ -2,8 +2,9 @@ import json
 import requests
 from campuslibs.loggers.mongo import save_to_mongo
 
-def handle_j1_enrollment(data):
-    url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create'
+def handle_j1_enrollment(data, provider_url):
+    # url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create'
+    url = provider_url
     headers = {
         'Content-Type': 'application/json'
     }
