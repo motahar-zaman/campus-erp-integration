@@ -4,11 +4,20 @@ from decimal import Decimal
 
 from datetime import datetime
 
-def write_status(doc, message, collection='publish_job'):
+
+def write_status(doc, status, collection='publish_job'):
+    db = get_db()
+    coll = db[collection]
+    doc['status'] = status
+
+    coll.update_one({'_id': doc['_id']}, {"$set": doc}, upsert=True)
+
+
+def write_log(doc, message, collection):
     db = get_db()
     coll = db[collection]
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    doc['status'].append({'message': message, 'time': current_time})
+    doc['log'].append({'message': message, 'time': current_time})
 
     coll.update_one({'_id': doc['_id']}, {"$set": doc}, upsert=True)
 
