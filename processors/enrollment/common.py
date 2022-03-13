@@ -14,7 +14,6 @@ def enroll(enrollment_data):
     payment = enrollment_data['payment']
 
     for item in enrollment_data['erp_list']:
-        course_provider = CourseProvider.objects.get(code=item['erp'])
         if item['erp'] == 'mindedge':
             for message_data in item['data']:
                 try:
@@ -26,6 +25,9 @@ def enroll(enrollment_data):
                                 collection='enrollment_status_history')
                     continue
         elif item['erp'] == 'j1':
+            # this is not good. we are hardcoding course provider code.
+            # todo: find a way not to hardcode this
+            course_provider = CourseProvider.objects.get(code=item['erp'])
             try:
                 provider_url = course_provider.configuration['url']
             except KeyError:
