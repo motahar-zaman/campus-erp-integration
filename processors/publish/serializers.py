@@ -7,6 +7,8 @@ from models.courseprovider.course_provider import CourseProvider as CourseProvid
 from models.course.course import Course as CourseModel
 from models.courseprovider.instructor import Instructor as InstructorModel
 from models.course.section_schedule import SectionSchedule as SectionScheduleModel
+from models.publish.publish_job import PublishJob as PublishJobModel
+from models.log.publish_log import PublishLog as PublishLogModel
 
 from rest_framework_mongoengine.fields import ReferenceField
 
@@ -73,3 +75,16 @@ class SectionScheduleModelSerializer(EmbeddedDocumentSerializer):
 
     class Meta:
         model = SectionScheduleModel
+
+
+class PublishJobModelSerializer(DocumentSerializer):
+
+    class Meta:
+        model = PublishJobModel
+
+
+class PublishLogModelSerializer(DocumentSerializer):
+    publish_job_id = ReferenceField(PublishJobModel)
+
+    class Meta:
+        model = PublishLogModel
