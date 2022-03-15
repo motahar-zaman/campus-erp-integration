@@ -11,6 +11,7 @@ from models.publish.publish_job import PublishJob as PublishJobModel
 from models.log.publish_log import PublishLog as PublishLogModel
 
 from rest_framework_mongoengine.fields import ReferenceField
+from django.utils.text import slugify
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -34,11 +35,14 @@ class CourseSerializer(serializers.ModelSerializer):
             'course_provider',
             'title',
             'content_ready',
-            'slug',
             'content_db_reference',
             'course_image_uri',
             'external_image_url'
         )
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(self.slug, allow_unicode=False)
+        return validated_data
 
 
 class CourseModelSerializer(DocumentSerializer):
@@ -46,6 +50,11 @@ class CourseModelSerializer(DocumentSerializer):
 
     class Meta:
         model = CourseModel
+        exclude = ('slug',)
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(self.slug, allow_unicode=False)
+        return validated_data
 
 
 class SectionSerializer(serializers.ModelSerializer):
