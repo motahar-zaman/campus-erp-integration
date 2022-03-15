@@ -16,7 +16,7 @@ from .helpers import (
     get_data
 )
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer
+from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer, PublishLogModelSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 from django_initializer import initialize_django
@@ -28,26 +28,35 @@ from models.courseprovider.provider_site import CourseProviderSite as CourseProv
 from models.courseprovider.instructor import Instructor as InstructorModel
 from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
+from models.log.publish_log import PublishLog as PublishLogModel
 from datetime import datetime
 import decimal
-from datetime import datetime
+from django.utils import timezone
 
 from django_scopes import scopes_disabled
+from models.publish.publish_job import PublishJob as PublishJobModel
 
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    mongo_data = {'data': data, 'job_id': doc['_id'], 'status': 'initiated', 'log': [{'message': 'initiated', 'time': current_time}]}
-    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+    entity_id = data['data']['external_id']
+    mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'section', 'entity_id': entity_id,
+                  'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated', 'time': datetime.now()}]}
+    log_serializer = PublishLogModelSerializer(data=mongo_data)
 
-    inserted_item = get_data(inserted_id, collection='queue_item')
+    if log_serializer.is_valid():
+        log = log_serializer.save()
+    else:
+        print(log_serializer.errors)
+
+    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_log(inserted_item, 'invalid parent in section', 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': 'invalid parent in section', 'time': datetime.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
 
     try:
@@ -72,8 +81,11 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
             course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
         except Course.DoesNotExist:
             # without that we can not proceed comfortably
-            write_log(inserted_item, 'postgres does not have a corresponding course', 'queue_item')
-            write_status(inserted_item, 'failed', collection='queue_item')
+            # write_log(inserted_item, 'postgres does not have a corresponding course', 'queue_item')
+            # write_status(inserted_item, 'failed', collection='queue_item')
+            inserted_item.logs.append({'level': 'critical', 'message':  'corresponding course does not found in database', 'time': datetime.now()})
+            inserted_item.status = 'failed'
+            inserted_item.save()
             return False
     # now update the sections in mongo
 
@@ -81,8 +93,11 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     if section_model_serializer.is_valid():
         pass
     else:
-        write_log(inserted_item, section_model_serializer.errors, 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        # write_log(inserted_item, section_model_serializer.errors, 'queue_item')
+        # write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': section_model_serializer.errors, 'time': datetime.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
     if course_model.sections:
         for section_idx, sec_data in enumerate(course_model.sections):
@@ -108,11 +123,17 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
 
         if serializer.is_valid():
             section = serializer.save()
-            write_log(inserted_item, 'section created', 'queue_item')
-            write_status(inserted_item, 'successful', collection='queue_item')
+            # write_log(inserted_item, 'section created', 'queue_item')
+            # write_status(inserted_item, 'successful', collection='queue_item')
+            inserted_item.logs.append({'level': 'info', 'message': 'section created', 'time': datetime.now()})
+            inserted_item.status = 'successful'
+            inserted_item.save()
         else:
-            write_log(inserted_item, serializer.errors, 'queue_item')
-            write_status(inserted_item, 'failed', collection='queue_item')
+            # write_log(inserted_item, serializer.errors, 'queue_item')
+            # write_status(inserted_item, 'failed', collection='queue_item')
+            inserted_item.logs.append({'level': 'critical', 'message': serializer.errors, 'time': datetime.now()})
+            inserted_item.status = 'failed'
+            inserted_item.save()
             return False
 
     # now, we find store courses, utilizing contracts.
@@ -159,29 +180,39 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.product_fee = section.fee
 
                     product.save()
-    write_log(inserted_item, 'section and product created', 'queue_item')
+    # write_log(inserted_item, 'section and product created', 'queue_item')
+    inserted_item.logs.append({'level': 'info', 'message': 'section and product created', 'time': datetime.now()})
+    inserted_item.save()
 
 
 def create_schedules(doc, data, course_provider_model):
     # insert every item in mongo to get status individually
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    mongo_data = {'data': data, 'job_id': doc['_id'],  'status': 'initiated', 'log': [{'message': 'initiated', 'time': current_time}]}
-    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+    entity_id = data['data']['external_id']
+    mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'schedule', 'entity_id': entity_id,
+                  'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated', 'time': timezone.now()}]}
+    log_serializer = PublishLogModelSerializer(data=mongo_data)
 
-    inserted_item = get_data(inserted_id, collection='queue_item')
+    if log_serializer.is_valid():
+        log = log_serializer.save()
+    else:
+        print(log_serializer.errors)
+
+    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_log(inserted_item, 'invalid parent in schedule', 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': 'invalid parent in schedule', 'time': timezone.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
 
     except CourseModel.MultipleObjectsReturned:
         # without that we can not proceed comfortably
-        write_log(inserted_item, 'many sections with the same external_id', 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': 'many sections with the same external_id', 'time': timezone.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
 
     try:
@@ -197,8 +228,10 @@ def create_schedules(doc, data, course_provider_model):
     # check if the provided data is valid. if not, abort.
     schedule_serializer = SectionScheduleModelSerializer(data=data['data'])
     if not schedule_serializer.is_valid():
-        write_log(inserted_item, schedule_serializer.errors, 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+
+        inserted_item.logs.append({'level': 'critical', 'message': schedule_serializer.errors, 'time': timezone.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
 
     for section_idx, section in enumerate(course_model.sections):
@@ -215,26 +248,35 @@ def create_schedules(doc, data, course_provider_model):
 
             course_model.sections[section_idx] = SectionModel(**serializer.data)
             course_model.save()
-            write_log(inserted_item, 'schedule created', 'queue_item')
-            write_status(inserted_item, 'successful', collection='queue_item')
+            inserted_item.logs.append({'level': 'critical', 'message': 'schedule created', 'time': timezone.now()})
+            inserted_item.status = 'successful'
+            inserted_item.save()
             break
 
 
 def create_instructors(doc, data, course_provider_model):
     # insert every item in mongo to get status individually
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    mongo_data = {'data': data, 'job_id': doc['_id'],  'status': 'initiated', 'log': [{'message': 'initiated', 'time': current_time}]}
-    inserted_id = insert_into_mongo(mongo_data, 'queue_item')
+    entity_id = data['data']['external_id']
+    mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'instructor', 'entity_id': entity_id,
+                  'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated'}]}
+    log_serializer = PublishLogModelSerializer(data=mongo_data)
 
-    inserted_item = get_data(inserted_id, collection='queue_item')
+    if log_serializer.is_valid():
+        log = log_serializer.save()
+    else:
+        print(log_serializer.errors)
+
+    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
     except CourseModel.DoesNotExist:
         # without that we can not proceed comfortably
-        write_log(inserted_item, 'invalid parent in instructor', 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': 'invalid parent in instructor'})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
+
     data['data']['provider'] = course_provider_model.id
     try:
         instructor_model = InstructorModel.objects.get(external_id=data['data']['external_id'], provider=course_provider_model)
@@ -245,11 +287,13 @@ def create_instructors(doc, data, course_provider_model):
 
     if instructor_model_serializer.is_valid():
         instructor_model = instructor_model_serializer.save()
-        write_log(inserted_item, 'instructor updated', 'queue_item')
-        write_status(inserted_item, 'successful', collection='queue_item')
+        inserted_item.logs.append({'level': 'info', 'message': 'instructor updated', 'time': timezone.now()})
+        inserted_item.status = 'successful'
+        inserted_item.save()
     else:
-        write_log(inserted_item, instructor_model_serializer.errors, 'queue_item')
-        write_status(inserted_item, 'failed', collection='queue_item')
+        inserted_item.logs.append({'level': 'critical', 'message': instructor_model_serializer.errors, 'time': timezone.now()})
+        inserted_item.status = 'failed'
+        inserted_item.save()
         return False
 
     for section in course_model.sections:
@@ -261,8 +305,9 @@ def create_instructors(doc, data, course_provider_model):
                     id=course_model.id,
                     sections__external_id=data['parent'],
                 ).update_one(set__sections__S=SectionModel(**serializer.data))
-    write_log(inserted_item, 'instructor created and updated', 'queue_item')
 
+    inserted_item.logs.append({'level': 'info', 'message': 'instructor updated'})
+    inserted_item.save()
     return True
 
 
@@ -270,10 +315,17 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
     for item in records:
         if item['type'] == 'course':
             # insert every item in mongo to get status individually
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            mongo_data = {'data': item, 'job_id': doc['_id'],  'status': 'initiated', 'log': [{'message': 'initiated', 'time': current_time}]}
-            inserted_id = insert_into_mongo(mongo_data, 'queue_item')
-            inserted_item = get_data(inserted_id, collection='queue_item')
+            entity_id = item['data']['external_id']
+            mongo_data = {'data': item, 'publish_job_id': doc['id'], 'publish_type': 'course', 'entity_id': entity_id,
+                          'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated', 'time': timezone.now()}]}
+
+            log_serializer = PublishLogModelSerializer(data=mongo_data)
+            if log_serializer.is_valid():
+                log = log_serializer.save()
+            else:
+                print(log_serializer.errors)
+
+            inserted_item = PublishLogModel.objects.get(id=log.id)
 
             data = item['data']
             level = data.get('level', None)
@@ -292,14 +344,18 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             if course_model_serializer.is_valid():
                 course_model = course_model_serializer.save()
             else:
-                write_log(inserted_item, course_model_serializer.errors, 'queue_item')
-                write_status(inserted_item, 'failed', collection='queue_item')
+                inserted_item.logs.append({'level': 'critical', 'message': course_model_serializer.errors, 'time': timezone.now()})
+                inserted_item.status = 'failed'
+                inserted_item.save()
+
                 return False
 
-            write_log(inserted_item, 'course saved in mongodb. trying to get data formatted for postgres.', collection='queue_item')
+            inserted_item.logs.append({'level': 'info', 'message': 'course saved', 'time': timezone.now()})
 
             course_data = prepare_course_postgres(course_model, course_provider)
-            write_log(inserted_item, 'prepare course for postgres', collection='queue_item')
+
+            inserted_item.logs.append({'level': 'info', 'message': 'course data formatted for database ', 'time': timezone.now()})
+            inserted_item.save()
 
             with scopes_disabled():
                 try:
@@ -311,11 +367,16 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 
                 if course_serializer.is_valid():
                     course = course_serializer.save()
-                    write_log(inserted_item, 'course created in postgres', 'queue_item')
-                    write_status(inserted_item, 'successful', collection='queue_item')
+                    inserted_item.logs.append({'level': 'info', 'message': 'course created', 'time': timezone.now()})
+                    inserted_item.status = 'successful'
+                    inserted_item.save()
+                    # write_log(inserted_item, 'course created in postgres', 'queue_item')
+                    # write_status(inserted_item, 'successful', collection='queue_item')
                 else:
-                    write_log(inserted_item, course_serializer.errors, collection='queue_item')
-                    write_status(inserted_item, 'failed', collection='queue_item')
+                    inserted_item.logs.append({'level': 'critical', 'message': course_serializer.errors, 'time': timezone.now()})
+                    inserted_item.status = 'failed'
+                    inserted_item.save()
+
                     return False
 
                 # create StoreCourse
@@ -325,54 +386,48 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         store=contract.store,
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
-                write_log(inserted_item, 'course and store_course created in postgres', 'queue_item')
-
-    write_log(doc, 'course creation is completed')
+                inserted_item.logs.append({'level': 'info', 'message': 'course and store_course created', 'time': timezone.now()})
+                inserted_item.save()
 
     return True
 
 
 def publish(doc_id):
-    doc = get_data(doc_id, collection='publish_job')
+    doc = PublishJobModel.objects.get(id=doc_id)
+
     if doc:
-        write_log(doc, 'request received', 'publish_job')
-        write_status(doc, 'request received', collection='publish_job')
+        # write_status(doc, 'request received', collection='publish_job')
         try:
             course_provider_id = doc['course_provider_id']
         except KeyError:
-            write_log(doc, 'key course_provider_id does not exist in data', 'publish_job')
-            write_status(doc, 'failed', collection='publish_job')
+            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider = CourseProvider.objects.get(id=course_provider_id)
         except CourseProvider.DoesNotExist:
-            write_log(doc, 'course provider not found', 'publish_job')
-            write_status(doc, 'failed', collection='publish_job')
+            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model_id = doc['course_provider_model_id']
         except KeyError:
-            write_log(doc, 'key course_provider_model_id does not exist in data', 'publish_job')
-            write_status(doc, 'failed', collection='publish_job')
+            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model = CourseProviderModel.objects.get(id=course_provider_model_id)
         except CourseProvider.DoesNotExist:
-            write_log(doc, 'course provider model not found', 'publish_job')
-            write_status(doc, 'failed', collection='publish_job')
+            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
-        if contracts.count() > 0:
-            write_log(doc, 'contracts found', 'publish_job')
+        # if contracts.count() > 0:
+        #     write_log(doc, 'contracts found', 'publish_job')
         try:
             records = doc['payload']['records']
         except KeyError:
-            write_log(doc, 'payload does not contain any records', 'publish_job')
-            write_status(doc, 'failed', collection='publish_job')
+            # write_status(doc, 'payload does not contain any records', collection='publish_job')
             return False
         # create courses first
         # because without courses everything else will not exist
@@ -385,7 +440,7 @@ def publish(doc_id):
         for item in records:
             if item['type'] == 'section':
                 create_sections(doc, item, course_provider, course_provider_model, contracts=contracts)
-        write_log(doc, 'section creation is completed', 'publish_job')
+        # write_log(doc, 'section creation is completed', 'publish_job')
 
         # then rest of the stuff
         for item in records:
@@ -395,6 +450,6 @@ def publish(doc_id):
                 create_instructors(doc, item, course_provider_model)
 
         print('message processing complete')
-        write_log(doc, 'message processing complete', 'publish_job')
-        write_status(doc, 'successful', collection='publish_job')
+        # write_log(doc, 'message processing complete', 'publish_job')
+        # write_status(doc, 'successful', collection='publish_job')
         # now handle everyting else
