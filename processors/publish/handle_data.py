@@ -42,7 +42,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'section', 'entity_id': entity_id,
                   'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated', 'time': datetime.now()}]}
     log_serializer = PublishLogModelSerializer(data=mongo_data)
-    log = None
+
     if log_serializer.is_valid():
         log = log_serializer.save()
     else:
@@ -83,7 +83,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
             # without that we can not proceed comfortably
             # write_log(inserted_item, 'postgres does not have a corresponding course', 'queue_item')
             # write_status(inserted_item, 'failed', collection='queue_item')
-            inserted_item.logs.append({'level': 'critical', 'message':  'postgres does not have a corresponding course', 'time': datetime.now()})
+            inserted_item.logs.append({'level': 'critical', 'message':  'corresponding course does not found in database', 'time': datetime.now()})
             inserted_item.status = 'failed'
             inserted_item.save()
             return False
@@ -131,7 +131,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
         else:
             # write_log(inserted_item, serializer.errors, 'queue_item')
             # write_status(inserted_item, 'failed', collection='queue_item')
-            inserted_item.logs.append({'level': 'critical', 'message': 'serializer.errors', 'time': datetime.now()})
+            inserted_item.logs.append({'level': 'critical', 'message': serializer.errors, 'time': datetime.now()})
             inserted_item.status = 'failed'
             inserted_item.save()
             return False
@@ -191,7 +191,7 @@ def create_schedules(doc, data, course_provider_model):
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'schedule', 'entity_id': entity_id,
                   'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated', 'time': timezone.now()}]}
     log_serializer = PublishLogModelSerializer(data=mongo_data)
-    log = None
+
     if log_serializer.is_valid():
         log = log_serializer.save()
     else:
@@ -260,7 +260,7 @@ def create_instructors(doc, data, course_provider_model):
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'publish_type': 'instructor', 'entity_id': entity_id,
                   'status': 'initiated', 'logs': [{'level': 'info', 'message': 'initiated'}]}
     log_serializer = PublishLogModelSerializer(data=mongo_data)
-    log = None
+
     if log_serializer.is_valid():
         log = log_serializer.save()
     else:
@@ -276,6 +276,7 @@ def create_instructors(doc, data, course_provider_model):
         inserted_item.status = 'failed'
         inserted_item.save()
         return False
+
     data['data']['provider'] = course_provider_model.id
     try:
         instructor_model = InstructorModel.objects.get(external_id=data['data']['external_id'], provider=course_provider_model)
@@ -286,11 +287,11 @@ def create_instructors(doc, data, course_provider_model):
 
     if instructor_model_serializer.is_valid():
         instructor_model = instructor_model_serializer.save()
-        inserted_item.logs.append({'level': 'info', 'message': 'instructor updated'})
+        inserted_item.logs.append({'level': 'info', 'message': 'instructor updated', 'time': timezone.now()})
         inserted_item.status = 'successful'
         inserted_item.save()
     else:
-        inserted_item.logs.append({'level': 'critical', 'message': instructor_model_serializer.errors})
+        inserted_item.logs.append({'level': 'critical', 'message': instructor_model_serializer.errors, 'time': timezone.now()})
         inserted_item.status = 'failed'
         inserted_item.save()
         return False
@@ -305,7 +306,7 @@ def create_instructors(doc, data, course_provider_model):
                     sections__external_id=data['parent'],
                 ).update_one(set__sections__S=SectionModel(**serializer.data))
 
-    inserted_item.logs.append({'level': 'info', 'message': 'instructor created and updated'})
+    inserted_item.logs.append({'level': 'info', 'message': 'instructor updated'})
     inserted_item.save()
     return True
 
@@ -349,12 +350,11 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 
                 return False
 
-            inserted_item.logs.append({'level': 'info', 'message':
-                'course saved in mongodb. trying to get data formatted for postgres', 'time': timezone.now()})
+            inserted_item.logs.append({'level': 'info', 'message': 'course saved', 'time': timezone.now()})
 
             course_data = prepare_course_postgres(course_model, course_provider)
 
-            inserted_item.logs.append({'level': 'info', 'message': 'prepare course for postgres', 'time': timezone.now()})
+            inserted_item.logs.append({'level': 'info', 'message': 'course data formatted for database ', 'time': timezone.now()})
             inserted_item.save()
 
             with scopes_disabled():
@@ -367,7 +367,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 
                 if course_serializer.is_valid():
                     course = course_serializer.save()
-                    inserted_item.logs.append({'level': 'info', 'message': 'course created in postgres', 'time': timezone.now()})
+                    inserted_item.logs.append({'level': 'info', 'message': 'course created', 'time': timezone.now()})
                     inserted_item.status = 'successful'
                     inserted_item.save()
                     # write_log(inserted_item, 'course created in postgres', 'queue_item')
@@ -386,7 +386,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         store=contract.store,
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
-                inserted_item.logs.append({'level': 'info', 'message': 'course and store_course created in postgres', 'time': timezone.now()})
+                inserted_item.logs.append({'level': 'info', 'message': 'course and store_course created', 'time': timezone.now()})
                 inserted_item.save()
 
     return True
