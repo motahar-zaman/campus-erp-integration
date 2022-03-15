@@ -6,7 +6,7 @@ from .payments import payment_transaction
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway
+from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway, CourseProvider
 from .mindedge import handle_mindedge_enrollment
 from .j1 import handle_j1_enrollment
 
@@ -25,10 +25,18 @@ def enroll(enrollment_data):
                                 collection='enrollment_status_history')
                     continue
         elif item['erp'] == 'j1':
+            # this is not good. we are hardcoding course provider code.
+            # todo: find a way not to hardcode this
+            course_provider = CourseProvider.objects.get(code=item['erp'])
+            try:
+                provider_url = course_provider.configuration['url']
+            except KeyError:
+                provider_url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create'
+
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
-            resp = handle_j1_enrollment(item['data'])
+            resp = handle_j1_enrollment(item['data'], provider_url)
             cart.enrollment_request['response'] = resp
             cart.save()
         else:
@@ -40,12 +48,12 @@ def enroll(enrollment_data):
                 else:
                     continue
 
-    if payment.amount > 0.0:
-        try:
-            store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
-            payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
-        except StorePaymentGateway.DoesNotExist:
-            pass
+    # if payment.amount > 0.0:
+    #     try:
+    #         store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
+    #         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+    #     except StorePaymentGateway.DoesNotExist:
+    #         pass
 
 
 def unenroll(data):
