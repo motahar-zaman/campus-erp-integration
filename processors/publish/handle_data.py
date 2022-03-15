@@ -348,7 +348,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                 inserted_item.status = 'failed'
                 inserted_item.save()
 
-                return False
+                continue
 
             inserted_item.logs.append({'level': 'info', 'message': 'course saved', 'time': timezone.now()})
 
@@ -377,7 +377,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                     inserted_item.status = 'failed'
                     inserted_item.save()
 
-                    return False
+                    continue
 
                 # create StoreCourse
                 for contract in contracts:
