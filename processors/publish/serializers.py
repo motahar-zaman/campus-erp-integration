@@ -41,8 +41,8 @@ class CourseSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        validated_data['slug'] = slugify(self.slug, allow_unicode=False)
-        return validated_data
+        validated_data['slug'] = slugify(validated_data['title'], allow_unicode=False)
+        return Course.objects.create(**validated_data)
 
 
 class CourseModelSerializer(DocumentSerializer):
@@ -53,8 +53,8 @@ class CourseModelSerializer(DocumentSerializer):
         exclude = ('slug',)
 
     def create(self, validated_data):
-        validated_data['slug'] = slugify(self.slug, allow_unicode=False)
-        return validated_data
+        validated_data['slug'] = slugify(validated_data['title'], allow_unicode=False)
+        return CourseModel.objects.create(**validated_data)
 
 
 class SectionSerializer(serializers.ModelSerializer):
