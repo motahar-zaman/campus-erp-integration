@@ -333,7 +333,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             data['level'] = level
             data['provider'] = course_provider_model.id
             try:
-                course_model = CourseModel.objects.get(external_id=data['external_id'], provider=course_provider_model)
+                course_model = CourseModel.objects.get(external_id=str(data['external_id']), provider=course_provider_model)
             except CourseModel.DoesNotExist:
                 course_model_serializer = CourseModelSerializer(data=data)
             else:
