@@ -35,6 +35,7 @@ from django.utils import timezone
 
 from django_scopes import scopes_disabled
 from models.publish.publish_job import PublishJob as PublishJobModel
+from mongoengine import NotUniqueError
 
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
@@ -342,13 +343,20 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                 course_model_serializer = CourseModelSerializer(course_model, data=data)
 
             if course_model_serializer.is_valid():
-                course_model = course_model_serializer.save()
+                try:
+                    course_model = course_model_serializer.save()
+                except NotUniqueError:
+                    inserted_item.logs.append({'level': 'critical', 'message': 'Tried to save duplicate unique key slug', 'time': timezone.now()})
+                    inserted_item.status = 'failed'
+                    inserted_item.save()
+
+                    continue
             else:
                 inserted_item.logs.append({'level': 'critical', 'message': course_model_serializer.errors, 'time': timezone.now()})
                 inserted_item.status = 'failed'
                 inserted_item.save()
 
-                return False
+                continue
 
             inserted_item.logs.append({'level': 'info', 'message': 'course saved', 'time': timezone.now()})
 
@@ -377,7 +385,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                     inserted_item.status = 'failed'
                     inserted_item.save()
 
-                    return False
+                    continue
 
                 # create StoreCourse
                 for contract in contracts:
