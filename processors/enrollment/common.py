@@ -24,19 +24,12 @@ def enroll(enrollment_data):
                     save_to_mongo(data={'type': 'erp', 'comment': 'unknown data format'},
                                 collection='enrollment_status_history')
                     continue
-        elif item['erp'] == 'j1':
-            # this is not good. we are hardcoding course provider code.
-            # todo: find a way not to hardcode this
-            course_provider = CourseProvider.objects.get(code=item['erp'])
-            try:
-                provider_url = course_provider.configuration['url']
-            except KeyError:
-                provider_url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create'
 
+        elif item['erp'] == 'j1':
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
-            resp = handle_j1_enrollment(item['data'], provider_url)
+            resp = handle_j1_enrollment(item['data'], item['enrollment_url'])
             cart.enrollment_request['response'] = resp
             cart.save()
         else:
