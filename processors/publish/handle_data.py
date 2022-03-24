@@ -387,6 +387,17 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
 
+                    if not created:
+                        store_course_sections = StoreCourseSection.objects.filter(store_course=store_course.id)
+                        for object in store_course_sections:
+                            try:
+                                product = object.product
+                            except KeyError:
+                                pass
+                            else:
+                                product.title = course.title
+                                product.save()
+
     return True
 
 
