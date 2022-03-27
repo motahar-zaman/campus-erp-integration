@@ -191,10 +191,7 @@ def create_schedules(doc, data, course_provider_model):
     else:
         print(log_serializer.errors)
 
-    try:
-        inserted_item = PublishLogModel.objects.get(id=log.id)
-    except KeyError:
-        return False
+    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
