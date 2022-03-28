@@ -45,11 +45,9 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(external_id=data['parent'], provider=course_provider_model)
@@ -62,17 +60,35 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
         return False
 
     try:
-        data['data']['start_date'] = get_datetime_obj(data['data']['start_date'])
+        data['data']['start_date'] = get_datetime_obj(data['data']['start_date'], inserted_item=inserted_item)
+        if not data['data']['start_date']:
+            inserted_item.errors = {'start_date': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['start_date'] = None
 
     try:
-        data['data']['end_date'] = get_datetime_obj(data['data']['end_date'])
+        data['data']['end_date'] = get_datetime_obj(data['data']['end_date'], inserted_item=inserted_item)
+        if not data['data']['end_date']:
+            inserted_item.errors = {'end_date': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['end_date'] = None
 
     try:
-        data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'])
+        data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'], inserted_item=inserted_item)
+        if not data['data']['registration_deadline']:
+            inserted_item.errors = {'registration_deadline': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['registration_deadline'] = None
 
@@ -187,11 +203,9 @@ def create_schedules(doc, data, course_provider_model):
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
@@ -212,12 +226,24 @@ def create_schedules(doc, data, course_provider_model):
         return False
 
     try:
-        data['data']['start_at'] = get_datetime_obj(data['data']['start_at'])
+        data['data']['start_at'] = get_datetime_obj(data['data']['start_at'], inserted_item=inserted_item)
+        if not data['data']['start_at']:
+            inserted_item.errors = {'start_at': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['start_at'] = None
 
     try:
-        data['data']['end_at'] = get_datetime_obj(data['data']['end_at'])
+        data['data']['end_at'] = get_datetime_obj(data['data']['end_at'], inserted_item=inserted_item)
+        if not data['data']['end_at']:
+            inserted_item.errors = {'end_at': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['end_at'] = None
 
@@ -258,11 +284,9 @@ def create_instructors(doc, data, course_provider_model):
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
@@ -319,11 +343,9 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             log_serializer = PublishLogModelSerializer(data=mongo_data)
 
             if log_serializer.is_valid():
-                log = log_serializer.save()
+                inserted_item = log_serializer.save()
             else:
                 print(log_serializer.errors)
-
-            inserted_item = PublishLogModel.objects.get(id=log.id)
 
             data = item['data']
             level = data.get('level', None)
