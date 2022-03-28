@@ -427,29 +427,24 @@ def publish(doc_id):
     doc = PublishJobModel.objects.get(id=doc_id)
 
     if doc:
-        # write_status(doc, 'request received', collection='publish_job')
         try:
             course_provider_id = doc['course_provider_id']
         except KeyError:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider = CourseProvider.objects.get(id=course_provider_id)
         except CourseProvider.DoesNotExist:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model_id = doc['course_provider_model_id']
         except KeyError:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model = CourseProviderModel.objects.get(id=course_provider_model_id)
         except CourseProvider.DoesNotExist:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
@@ -458,7 +453,6 @@ def publish(doc_id):
         try:
             records = doc['payload']['records']
         except KeyError:
-            # write_status(doc, 'payload does not contain any records', collection='publish_job')
             return False
         # create courses first
         # because without courses everything else will not exist
