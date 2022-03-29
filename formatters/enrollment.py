@@ -127,7 +127,7 @@ class EnrollmentFormatter(object):
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
                     mindedge_enrollment_url = enrollment_url
 
-                elif course_enrollment.course.course_provider.configurationget('erp', '') == 'j1':
+                elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
                     j1_enrollment_url = enrollment_url
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
