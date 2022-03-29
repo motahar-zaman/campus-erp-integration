@@ -123,11 +123,11 @@ class EnrollmentFormatter(object):
                 except KeyError:
                     enrollment_url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create' #j1 provider url
 
-                if course_enrollment.course.course_provider.configuration['erp'] == 'mindedge':
+                if course_enrollment.course.course_provider.configuration.get('erp', '') == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
                     mindedge_enrollment_url = enrollment_url
 
-                elif course_enrollment.course.course_provider.configuration['erp'] == 'j1':
+                elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
                     j1_enrollment_url = enrollment_url
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
