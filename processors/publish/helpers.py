@@ -4,10 +4,21 @@ from decimal import Decimal
 
 from datetime import datetime
 
-def write_status(doc, status):
+
+def write_status(doc, status, collection='publish_job'):
     db = get_db()
-    coll = db['publish_job']
+    coll = db[collection]
     doc['status'] = status
+
+    coll.update_one({'_id': doc['_id']}, {"$set": doc}, upsert=True)
+
+
+def write_log(doc, message, collection):
+    db = get_db()
+    coll = db[collection]
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    doc['log'].append({'message': message, 'time': current_time})
+
     coll.update_one({'_id': doc['_id']}, {"$set": doc}, upsert=True)
 
 
@@ -296,3 +307,18 @@ def upsert_mongo_doc(collection=None, query=None, data=None):
 
         return doc['_id']
     return None
+
+
+def insert_into_mongo(mongo_data, collection):
+    db = get_db()
+    coll = db[collection]
+    result = coll.insert_one(mongo_data)
+
+    return result.inserted_id
+
+
+def get_data(doc_id, collection):
+    db = get_db()
+    coll = db[collection]
+    doc = coll.find_one({'_id': ObjectId(doc_id)})
+    return doc

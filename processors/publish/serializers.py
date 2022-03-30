@@ -7,8 +7,11 @@ from models.courseprovider.course_provider import CourseProvider as CourseProvid
 from models.course.course import Course as CourseModel
 from models.courseprovider.instructor import Instructor as InstructorModel
 from models.course.section_schedule import SectionSchedule as SectionScheduleModel
+from models.publish.publish_job import PublishJob as PublishJobModel
+from models.log.publish_log import PublishLog as PublishLogModel
 
 from rest_framework_mongoengine.fields import ReferenceField
+from django.utils.text import slugify
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -32,11 +35,14 @@ class CourseSerializer(serializers.ModelSerializer):
             'course_provider',
             'title',
             'content_ready',
-            'slug',
             'content_db_reference',
             'course_image_uri',
             'external_image_url'
         )
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(validated_data['title'], allow_unicode=False)
+        return Course.objects.create(**validated_data)
 
 
 class CourseModelSerializer(DocumentSerializer):
@@ -44,6 +50,11 @@ class CourseModelSerializer(DocumentSerializer):
 
     class Meta:
         model = CourseModel
+        exclude = ('slug',)
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(validated_data['title'], allow_unicode=False)
+        return CourseModel.objects.create(**validated_data)
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -73,3 +84,16 @@ class SectionScheduleModelSerializer(EmbeddedDocumentSerializer):
 
     class Meta:
         model = SectionScheduleModel
+
+
+class PublishJobModelSerializer(DocumentSerializer):
+
+    class Meta:
+        model = PublishJobModel
+
+
+class PublishLogModelSerializer(DocumentSerializer):
+    publish_job_id = ReferenceField(PublishJobModel)
+
+    class Meta:
+        model = PublishLogModel
