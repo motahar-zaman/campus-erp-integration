@@ -257,14 +257,16 @@ def create_schedules(doc, data, course_provider_model):
         return False
 
     for section_idx, section in enumerate(course_model.sections):
+        schedule_exist = False
         if section['external_id'] == data['parent']:
             serializer = CheckSectionModelValidationSerializer(section)
             if serializer.data['schedules']:
                 for schedule_idx, schedule in enumerate(serializer.data['schedules']):
-                    if schedule['external_id'] == data['data']['external_id']:
+                    if schedule['external_id'] == str(data['data']['external_id']):
+                        schedule_exist = True
                         serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
-                    else:
-                        serializer.data['schedules'].append(schedule_serializer.data)
+                if not schedule_exist:
+                    serializer.data['schedules'].append(schedule_serializer.data)
             else:
                 serializer.data['schedules'].append(schedule_serializer.data)
 
@@ -300,7 +302,7 @@ def create_instructors(doc, data, course_provider_model):
 
     data['data']['provider'] = course_provider_model.id
     try:
-        instructor_model = InstructorModel.objects.get(external_id=data['data']['external_id'], provider=course_provider_model)
+        instructor_model = InstructorModel.objects.get(external_id=str(data['data']['external_id']), provider=course_provider_model)
     except InstructorModel.DoesNotExist:
         instructor_model_serializer = InstructorModelSerializer(data=data['data'])
     else:
