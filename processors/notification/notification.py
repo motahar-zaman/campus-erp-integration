@@ -91,5 +91,13 @@ def send_message_to_course_provider(url, data):
     headers = {
         'Content-Type': 'application/json'
     }
-    response = requests.request("POST", url, headers=headers, data=data)
-    return True, response.json()
+    try:
+        response = requests.request("POST", url, headers=headers, data=data)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        return False, str(err)
+    try:
+        resp = response.json()
+    except ValueError:
+        return False, {'message': 'invalid response received'}
+    return True, resp
