@@ -165,7 +165,6 @@ def import_courses_postgres(import_task):
                         course.slug = course_model.slug
                         course.content_db_reference = str(course_model.id)
                         course.course_image_uri = course_model.image['original']
-                        course.content_ready = False
                         course.external_image_url = course_model.default_image
                         course.save()
                         import_task.queue_processed = 2
@@ -337,7 +336,7 @@ def import_sections_mongo(import_task):
         print('could not connect to mongodb')
     finally:
         mongo_client.disconnect_mongodb()
-    
+
     print('queueing postgres task for importing sections')
     create_queue_postgres(import_task)
 
