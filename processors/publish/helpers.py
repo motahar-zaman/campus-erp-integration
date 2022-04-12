@@ -112,7 +112,7 @@ def prepare_section_mongo(data, course_provider_model):
     return section_data
 
 
-def get_datetime_obj(date_time_str):
+def get_datetime_obj(date_time_str, inserted_item = None):
     if date_time_str is None or date_time_str == '':
         return None
 
@@ -125,11 +125,18 @@ def get_datetime_obj(date_time_str):
     if time_str == '':
         time_str = '00:00:00'
 
-    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        if inserted_item:
+            return False
+        return None
+
     if time_str is None:
         time_str = '00:00:00'
     time = datetime.strptime(time_str, '%H:%M:%S').time()
     datetime_obj = datetime.combine(date, time)
+
     return datetime_obj
 
 

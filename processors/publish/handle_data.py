@@ -45,11 +45,9 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(external_id=data['parent'], provider=course_provider_model)
@@ -62,17 +60,35 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
         return False
 
     try:
-        data['data']['start_date'] = get_datetime_obj(data['data']['start_date'])
+        data['data']['start_date'] = get_datetime_obj(data['data']['start_date'], inserted_item=inserted_item)
+        if not data['data']['start_date']:
+            inserted_item.errors = {'start_date': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['start_date'] = None
 
     try:
-        data['data']['end_date'] = get_datetime_obj(data['data']['end_date'])
+        data['data']['end_date'] = get_datetime_obj(data['data']['end_date'], inserted_item=inserted_item)
+        if not data['data']['end_date']:
+            inserted_item.errors = {'end_date': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['end_date'] = None
 
     try:
-        data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'])
+        data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'], inserted_item=inserted_item)
+        if not data['data']['registration_deadline']:
+            inserted_item.errors = {'registration_deadline': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['registration_deadline'] = None
 
@@ -187,14 +203,9 @@ def create_schedules(doc, data, course_provider_model):
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    try:
-        inserted_item = PublishLogModel.objects.get(id=log.id)
-    except KeyError:
-        return False
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
@@ -215,12 +226,24 @@ def create_schedules(doc, data, course_provider_model):
         return False
 
     try:
-        data['data']['start_at'] = get_datetime_obj(data['data']['start_at'])
+        data['data']['start_at'] = get_datetime_obj(data['data']['start_at'], inserted_item=inserted_item)
+        if not data['data']['start_at']:
+            inserted_item.errors = {'start_at': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['start_at'] = None
 
     try:
-        data['data']['end_at'] = get_datetime_obj(data['data']['end_at'])
+        data['data']['end_at'] = get_datetime_obj(data['data']['end_at'], inserted_item=inserted_item)
+        if not data['data']['end_at']:
+            inserted_item.errors = {'end_at': ['invalid date']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
     except KeyError:
         data['data']['end_at'] = None
 
@@ -234,14 +257,16 @@ def create_schedules(doc, data, course_provider_model):
         return False
 
     for section_idx, section in enumerate(course_model.sections):
+        schedule_exist = False
         if section['external_id'] == data['parent']:
             serializer = CheckSectionModelValidationSerializer(section)
             if serializer.data['schedules']:
                 for schedule_idx, schedule in enumerate(serializer.data['schedules']):
-                    if schedule['external_id'] == data['data']['external_id']:
+                    if schedule['external_id'] == str(data['data']['external_id']):
+                        schedule_exist = True
                         serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
-                    else:
-                        serializer.data['schedules'].append(schedule_serializer.data)
+                if not schedule_exist:
+                    serializer.data['schedules'].append(schedule_serializer.data)
             else:
                 serializer.data['schedules'].append(schedule_serializer.data)
 
@@ -261,11 +286,9 @@ def create_instructors(doc, data, course_provider_model):
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
-        log = log_serializer.save()
+        inserted_item = log_serializer.save()
     else:
         print(log_serializer.errors)
-
-    inserted_item = PublishLogModel.objects.get(id=log.id)
 
     try:
         course_model = CourseModel.objects.get(sections__external_id=data['parent'], provider=course_provider_model)
@@ -279,7 +302,7 @@ def create_instructors(doc, data, course_provider_model):
 
     data['data']['provider'] = course_provider_model.id
     try:
-        instructor_model = InstructorModel.objects.get(external_id=data['data']['external_id'], provider=course_provider_model)
+        instructor_model = InstructorModel.objects.get(external_id=str(data['data']['external_id']), provider=course_provider_model)
     except InstructorModel.DoesNotExist:
         instructor_model_serializer = InstructorModelSerializer(data=data['data'])
     else:
@@ -322,11 +345,9 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             log_serializer = PublishLogModelSerializer(data=mongo_data)
 
             if log_serializer.is_valid():
-                log = log_serializer.save()
+                inserted_item = log_serializer.save()
             else:
                 print(log_serializer.errors)
-
-            inserted_item = PublishLogModel.objects.get(id=log.id)
 
             data = item['data']
             level = data.get('level', None)
@@ -408,29 +429,24 @@ def publish(doc_id):
     doc = PublishJobModel.objects.get(id=doc_id)
 
     if doc:
-        # write_status(doc, 'request received', collection='publish_job')
         try:
             course_provider_id = doc['course_provider_id']
         except KeyError:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider = CourseProvider.objects.get(id=course_provider_id)
         except CourseProvider.DoesNotExist:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model_id = doc['course_provider_model_id']
         except KeyError:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         try:
             course_provider_model = CourseProviderModel.objects.get(id=course_provider_model_id)
         except CourseProvider.DoesNotExist:
-            # write_status(doc, 'failed', collection='publish_job')
             return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
@@ -439,7 +455,6 @@ def publish(doc_id):
         try:
             records = doc['payload']['records']
         except KeyError:
-            # write_status(doc, 'payload does not contain any records', collection='publish_job')
             return False
         # create courses first
         # because without courses everything else will not exist
