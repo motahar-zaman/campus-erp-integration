@@ -4,6 +4,7 @@ from decouple import config
 from django.utils import timezone
 from shared_models.models import Notification, NotificationLog, Event, Payment, Cart, EventSubscription, Partner
 from django_scopes import scopes_disabled
+import requests
 
 
 def notification_to_course_provider(notification_id):
@@ -60,7 +61,13 @@ def notification_to_course_provider(notification_id):
             if subscribed:
                 print('subscribed')
                 url = partner.notification_submission_url
-                send_msg, response = send_message_to_course_provider(url, notification)
+
+                data = {
+                    'notification': str(notification.id),
+                    'notification_type': notification_type,
+                    'message': 'you got an '+notification_type
+                }
+                send_msg, response = send_message_to_course_provider(url, data)
                 if send_msg:
                     notification.status = Notification.STATUS_SUCCESSFUL
                 else:
@@ -81,11 +88,8 @@ def notification_to_course_provider(notification_id):
 
 
 def send_message_to_course_provider(url, data):
-    response = {'status': '200'}
-    return True, response
-
-    # headers = {
-    #     'Content-Type': 'application/json'
-    # }
-    # response = requests.request("POST", url, headers=headers, data=json.dumps(data))
-    # return response.json()
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    response = requests.request("POST", url, headers=headers, data=data)
+    return True, response.json()
