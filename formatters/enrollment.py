@@ -86,17 +86,15 @@ class EnrollmentFormatter(object):
         }
 
     def enroll(self, payload):
-        print('------------------------------------')
-        print(payload)
-        print('------------------------------------')
         mindedge_data = []
         common_data = []
         j1_data = {
             'enrollments': []
         }
-        j1_enrollment_url = None
-        mindedge_enrollment_url = None
-        common_enrollment_url = None
+
+        mindedge_config = {}
+        j1_config = {}
+        common_config = {}
 
         payment = None
         try:
@@ -125,10 +123,10 @@ class EnrollmentFormatter(object):
 
                 if course_enrollment.course.course_provider.configuration.get('erp', '') == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
-                    mindedge_enrollment_url = enrollment_url
+                    mindedge_config = course_enrollment.course.course_provider.configuration
 
                 elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
-                    j1_enrollment_url = enrollment_url
+                    j1_config = course_enrollment.course.course_provider.configuration
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
                     j1_data['payment'] = {
@@ -157,7 +155,8 @@ class EnrollmentFormatter(object):
                     j1_data['agreement_details'] = agreement_details
                 else:
                     common_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
-                    common_enrollment_url = enrollment_url
+                    common_config = course_enrollment.course.course_provider.configuration
+
         except Payment.DoesNotExist:
             pass
 
@@ -165,15 +164,15 @@ class EnrollmentFormatter(object):
             'erp_list':[{
                 'erp': 'mindedge',
                 'data': mindedge_data,
-                'enrollment_url': mindedge_enrollment_url
+                'config': mindedge_config
             }, {
                 'erp': 'j1',
                 'data': j1_data,
-                'enrollment_url': j1_enrollment_url
+                'config': j1_config
             }, {
                 'erp': 'none',
                 'data': common_data,
-                'enrollment_url': common_enrollment_url
+                'config': common_config
             }],
             'payment': payment,
             'store_payment_gateway_id': payload['store_payment_gateway_id']

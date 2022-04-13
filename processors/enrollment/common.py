@@ -29,7 +29,7 @@ def enroll(enrollment_data):
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
-            resp = handle_j1_enrollment(item['data'], item['enrollment_url'])
+            resp = handle_j1_enrollment(item['data'], item['config'])
             cart.enrollment_request['response'] = resp
             cart.save()
         else:
