@@ -18,9 +18,6 @@ def payment_transaction(payment, store_payment_gateway, transaction_type):
     createtransactionrequest = apicontractsv1.createTransactionRequest()
     createtransactionrequest.merchantAuthentication = merchant_auth
     createtransactionrequest.refId = str(payment.transaction_request_id)
-    createtransactionrequest.emailCustomer = True
-    createtransactionrequest.headerEmailReceipt = "Greetings from J1 Store! We have received your following payment."
-    createtransactionrequest.footerEmailReceipt = "For any support please communicate your AUTH CODE to the relevant authority. Thank you!"
 
     createtransactionrequest.transactionRequest = transactionrequest
     createtransactioncontroller = createTransactionController(createtransactionrequest)
@@ -33,7 +30,7 @@ def payment_transaction(payment, store_payment_gateway, transaction_type):
         status_data = {
             'type': 'payment',
             'payment_status': 'success',
-            'transaction_id': response.transactionResponse.transId,
+            'transaction_id': str(response.transactionResponse.transId),
             'description': response.transactionResponse.messages.message[0].description,
             'transaction_type': transaction_type
         }
