@@ -9,6 +9,13 @@ def handle_j1_enrollment(data, config):
     }
     save_to_mongo(data={'erp': 'j1:payload', 'data': data}, collection='erp_response')
 
+    # this here will check first if the configuration has a key called `auth_type`
+    # and if it's value is set to `basic`
+
+    # otherwise this should not work. however, leaving it as is for now, since there is only one type
+    # of auth now.
+    # will be implemented when other type of auth_type is added.
+
     try:
         response = requests.request(
             "POST",
