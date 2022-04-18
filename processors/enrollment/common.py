@@ -29,7 +29,7 @@ def enroll(enrollment_data):
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
-            resp = handle_j1_enrollment(item['data'], item['enrollment_url'])
+            resp = handle_j1_enrollment(item['data'], item['config'])
             cart.enrollment_request['response'] = resp
             cart.save()
         else:
@@ -41,13 +41,13 @@ def enroll(enrollment_data):
                 else:
                     continue
 
-    # if payment.amount > 0.0:
-    #     try:
-    #         store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
-    #         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
-    #     except StorePaymentGateway.DoesNotExist:
-    #         pass
-
+    if payment.amount > 0.0:
+        try:
+            store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
+            payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
+        except StorePaymentGateway.DoesNotExist:
+            print('store payment gateway not found')
+            pass
 
 def unenroll(data):
     with scopes_disabled():
