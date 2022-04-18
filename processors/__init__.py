@@ -1,5 +1,5 @@
 import json
-
+import time
 from formatters.enrollment import EnrollmentFormatter
 from formatters.crm import CRMFormatter
 from formatters.tax import TaxFormatter
@@ -10,8 +10,10 @@ from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
 from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo, import_sections_postgres
 from processors.publish.handle_data import publish
+from processors.notification.notification import notification_to_course_provider
 
 from loggers.elastic_search import upload_log
+from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
 
 
 def requestlog_callback(ch, method, properties, body):
@@ -112,3 +114,9 @@ def import_callback(ch, method, properties, body):
 def publish_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
     publish(payload['doc_id'])
+
+
+def notification_callback(ch, method, properties, body):
+    time.sleep(10)  # Sleep for 10 seconds to create cart items
+    payload = json.loads(body.decode())
+    notification_to_course_provider(payload['notification_id'])
