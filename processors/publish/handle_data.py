@@ -25,7 +25,7 @@ from django_initializer import initialize_django
 initialize_django()
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store
+    StoreCourseSection, Store, RelatedProduct
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -43,8 +43,7 @@ from mongoengine import NotUniqueError
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section', 'time': timezone.now(),
-                  'message': 'task is still in queue', 'status': 'pending',
-                  'external_id': data['data']['external_id']}
+                  'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data']['external_id']}
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
@@ -156,6 +155,8 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     # now, we find store courses, utilizing contracts.
     # if we find store courses, we update store course sections
 
+    related_products = data.get('related_products', None)
+
     for contract in contracts:
         with scopes_disabled():
             try:
@@ -196,6 +197,25 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.fee = section.fee
                     product.minimum_fee = section.fee
                     product.save()
+
+                for related_product in related_products:
+                    try:
+                        child_product = Product.objects.get(
+                            external_id=related_product['external_id'],
+                            product_type=related_product['type']
+                        )
+                    except Exception:
+                        pass
+                    else:
+                        try:
+                            related_product = RelatedProduct.objects.create(
+                                product=product,
+                                related_product=child_product,
+                                related_product_type=related_product['relation_type']
+                            )
+                        except Exception:
+                            pass
+
 
 
 def create_schedules(doc, data, course_provider_model):
