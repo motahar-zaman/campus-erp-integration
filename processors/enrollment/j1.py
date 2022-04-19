@@ -3,14 +3,13 @@ from multiprocessing.sharedctypes import Value
 import requests
 from campuslibs.loggers.mongo import save_to_mongo
 
-def handle_j1_enrollment(data, config):
+def handle_enrollment(data, config):
     headers = {
         'Content-Type': 'application/json'
     }
     save_to_mongo(data={'erp': 'j1:payload', 'data': data}, collection='erp_response')
 
     if config.get('auth_type', '') == 'basic':
-
         try:
             response = requests.request(
                 "POST",
