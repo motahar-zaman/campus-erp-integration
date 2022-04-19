@@ -87,6 +87,9 @@ class EnrollmentFormatter(object):
 
     def enroll(self, payload):
         mindedge_data = []
+        hir_data = {
+            'enrollments': []
+        }
         common_data = []
         j1_data = {
             'enrollments': []
@@ -94,6 +97,7 @@ class EnrollmentFormatter(object):
 
         mindedge_config = {}
         j1_config = {}
+        hir_config = {}
         common_config = {}
 
         payment = None
@@ -153,6 +157,36 @@ class EnrollmentFormatter(object):
                             continue
                         agreement_details[question.external_id] = val
                     j1_data['agreement_details'] = agreement_details
+
+                elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'hir':
+                    hir_config = course_enrollment.course.course_provider.configuration
+                    hir_data['order_id'] = str(payment.cart.order_ref)
+                    hir_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    hir_data['payment'] = {
+                        'amount': str(payment.amount),
+                        'currency_code': payment.currency_code,
+                        'transaction_reference': payment.transaction_reference,
+                        'auth_code': payment.auth_code,
+                        'payment_type': payment.payment_type,
+                        'bank': payment.bank,
+                        'account_number': payment.account_number,
+                        'card_type': payment.card_type,
+                        'card_number': payment.card_number,
+                        'reason_code': payment.reason_code,
+                        'reason_description': payment.reason_description,
+                        'customer_ip': payment.customer_ip,
+                        'status': payment.status,
+                        'transaction_time': str(payment.transaction_time),
+                    }
+                    agreement_details = {}
+                    for key, val in payment.cart.agreement_details.items():
+                        try:
+                            question = QuestionBank.objects.get(id=key)
+                        except (QuestionBank.DoesNotExist, ValidationError):
+                            continue
+                        agreement_details[question.external_id] = val
+                    hir_data['agreement_details'] = agreement_details
+
                 else:
                     common_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
                     common_config = course_enrollment.course.course_provider.configuration
@@ -169,6 +203,10 @@ class EnrollmentFormatter(object):
                 'erp': 'j1',
                 'data': j1_data,
                 'config': j1_config
+            }, {
+                'erp': 'hir',
+                'data': hir_data,
+                'config': hir_config
             }, {
                 'erp': 'none',
                 'data': common_data,
