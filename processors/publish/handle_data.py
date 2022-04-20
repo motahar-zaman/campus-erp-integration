@@ -25,7 +25,7 @@ from django_initializer import initialize_django
 initialize_django()
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store
+    StoreCourseSection, Store, RelatedProduct
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -43,8 +43,7 @@ from mongoengine import NotUniqueError
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section', 'time': timezone.now(),
-                  'message': 'task is still in queue', 'status': 'pending',
-                  'external_id': data['data']['external_id']}
+                  'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data']['external_id']}
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
@@ -156,6 +155,8 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     # now, we find store courses, utilizing contracts.
     # if we find store courses, we update store course sections
 
+    related_products = data.get('related_products', None)
+
     for contract in contracts:
         with scopes_disabled():
             try:
@@ -196,6 +197,24 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.fee = section.fee
                     product.minimum_fee = section.fee
                     product.save()
+
+                for related_product in related_products:
+                    try:
+                        child_product = Product.objects.get(
+                            external_id=related_product['external_id'],
+                            product_type=related_product['type']
+                        )
+                    except Exception:
+                        pass
+                    else:
+                        try:
+                            related_product = RelatedProduct.objects.create(
+                                product=product,
+                                related_product=child_product,
+                                related_product_type=related_product['relation_type']
+                            )
+                        except Exception:
+                            pass
 
 
 def create_schedules(doc, data, course_provider_model):
@@ -451,24 +470,26 @@ def create_products(doc, item, course_provider_model):
 
     else:
         # create or update product
+        data = item['data']
         product_data = {
             'store': store.id,
-            'external_id': item['data']['external_id'],
-            'product_type': item['data']['product_type'],
-            'title': item['data']['title'],
-            'content': item['data']['content'],
-            'limit_applicable': item['data']['limit_applicable'],
-            'total_quantity': item['data']['total_quantity'],
-            'quantity_sold': item['data']['quantity_sold'],
-            'available_quantity': item['data']['available_quantity'],
-            'tax_code': item['data']['tax_code'],
-            'fee': item['data']['fee'],
-            'minimum_fee': item['data']['minimum_fee'],
-            'currency_code': item['data']['currency_code']
+            'external_id': data.get('external_id', None),
+            'product_type': data.get('product_type', ''),
+            'title': data.get('title', ''),
+            'content': data.get('content', {}),
+            'limit_applicable': data.get('limit_applicable', False),
+            'total_quantity': data.get('total_quantity', None),
+            'quantity_sold': data.get('quantity_sold', 0),
+            'available_quantity': data.get('available_quantity', None),
+            'tax_code': data.get('tax_code', ''),
+            'fee': data.get('fee', 0),
+            'minimum_fee': data.get('minimum_fee', 0),
+            'currency_code': data.get('currency_code', 'usd')
         }
+
         with scopes_disabled():
             try:
-                product = Product.objects.get(external_id= str(item['data']['external_id']))
+                product = Product.objects.get(external_id= str(item['data']['external_id']), store=store, product_type=item['data']['product_type'])
             except Product.DoesNotExist:
                 product_serializer = ProductSerializer(data=product_data)
             else:
