@@ -217,7 +217,6 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                             pass
 
 
-
 def create_schedules(doc, data, course_provider_model):
     # insert every item in mongo to get status individually
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule', 'time': timezone.now(),
@@ -486,9 +485,10 @@ def create_products(doc, item, course_provider_model):
             'minimum_fee': item['data']['minimum_fee'],
             'currency_code': item['data']['currency_code']
         }
+
         with scopes_disabled():
             try:
-                product = Product.objects.get(external_id= str(item['data']['external_id']))
+                product = Product.objects.get(external_id= str(item['data']['external_id']), store=store, product_type=item['data']['product_type'])
             except Product.DoesNotExist:
                 product_serializer = ProductSerializer(data=product_data)
             else:
