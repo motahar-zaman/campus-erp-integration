@@ -470,20 +470,21 @@ def create_products(doc, item, course_provider_model):
 
     else:
         # create or update product
+        data = item['data']
         product_data = {
             'store': store.id,
-            'external_id': item['data']['external_id'],
-            'product_type': item['data']['product_type'],
-            'title': item['data']['title'],
-            'content': item['data']['content'],
-            'limit_applicable': item['data']['limit_applicable'],
-            'total_quantity': item['data']['total_quantity'],
-            'quantity_sold': item['data']['quantity_sold'],
-            'available_quantity': item['data']['available_quantity'],
-            'tax_code': item['data']['tax_code'],
-            'fee': item['data']['fee'],
-            'minimum_fee': item['data']['minimum_fee'],
-            'currency_code': item['data']['currency_code']
+            'external_id': data.get('external_id', None),
+            'product_type': data.get('product_type', ''),
+            'title': data.get('title', ''),
+            'content': data.get('content', {}),
+            'limit_applicable': data.get('limit_applicable', False),
+            'total_quantity': data.get('total_quantity', None),
+            'quantity_sold': data.get('quantity_sold', 0),
+            'available_quantity': data.get('available_quantity', None),
+            'tax_code': data.get('tax_code', ''),
+            'fee': data.get('fee', 0),
+            'minimum_fee': data.get('minimum_fee', 0),
+            'currency_code': data.get('currency_code', 'usd')
         }
 
         with scopes_disabled():
