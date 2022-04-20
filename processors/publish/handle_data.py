@@ -155,7 +155,7 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     # now, we find store courses, utilizing contracts.
     # if we find store courses, we update store course sections
 
-    related_products = data.get('related_products', None)
+    related_products = data.get('related_products', [])
 
     for contract in contracts:
         with scopes_disabled():
