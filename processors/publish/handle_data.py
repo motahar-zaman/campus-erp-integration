@@ -16,13 +16,16 @@ from .helpers import (
     get_data
 )
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer, PublishLogModelSerializer
+from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer,\
+    CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer,\
+    PublishLogModelSerializer, ProductSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 from django_initializer import initialize_django
 initialize_django()
 
-from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product, StoreCourseSection
+from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
+    StoreCourseSection, Store, RelatedProduct
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -40,8 +43,7 @@ from mongoengine import NotUniqueError
 def create_sections(doc, data, course_provider, course_provider_model, contracts=[]):
     # insert every item in mongo to get status individually
     mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section', 'time': timezone.now(),
-                  'message': 'task is still in queue', 'status': 'pending',
-                  'external_id': data['data']['external_id']}
+                  'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data']['external_id']}
 
     log_serializer = PublishLogModelSerializer(data=mongo_data)
     if log_serializer.is_valid():
@@ -153,6 +155,8 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
     # now, we find store courses, utilizing contracts.
     # if we find store courses, we update store course sections
 
+    related_products = data.get('related_products', None)
+
     for contract in contracts:
         with scopes_disabled():
             try:
@@ -193,6 +197,24 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
                     product.fee = section.fee
                     product.minimum_fee = section.fee
                     product.save()
+
+                for related_product in related_products:
+                    try:
+                        child_product = Product.objects.get(
+                            external_id=related_product['external_id'],
+                            product_type=related_product['type']
+                        )
+                    except Exception:
+                        pass
+                    else:
+                        try:
+                            related_product = RelatedProduct.objects.create(
+                                product=product,
+                                related_product=child_product,
+                                related_product_type=related_product['relation_type']
+                            )
+                        except Exception:
+                            pass
 
 
 def create_schedules(doc, data, course_provider_model):
@@ -425,6 +447,68 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
     return True
 
 
+def create_products(doc, item, course_provider_model):
+    # insert every item in mongo to get status individually
+    mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product', 'time': timezone.now(),
+                  'message': 'task is still in queue', 'status': 'pending',
+                  'external_id': item['data']['external_id']}
+
+    log_serializer = PublishLogModelSerializer(data=mongo_data)
+    if log_serializer.is_valid():
+        inserted_item = log_serializer.save()
+    else:
+        print(log_serializer.errors)
+
+    try:
+        store = Store.objects.get(url_slug=item['data']['store_slug'])
+    except Store.DoesNotExist:
+        inserted_item.errors = {'store': ['corresponding store does not found in database']}
+        inserted_item.status = 'failed'
+        inserted_item.message = 'error occurred'
+        inserted_item.save()
+        return False
+
+    else:
+        # create or update product
+        data = item['data']
+        product_data = {
+            'store': store.id,
+            'external_id': data.get('external_id', None),
+            'product_type': data.get('product_type', ''),
+            'title': data.get('title', ''),
+            'content': data.get('content', {}),
+            'limit_applicable': data.get('limit_applicable', False),
+            'total_quantity': data.get('total_quantity', None),
+            'quantity_sold': data.get('quantity_sold', 0),
+            'available_quantity': data.get('available_quantity', None),
+            'tax_code': data.get('tax_code', ''),
+            'fee': data.get('fee', 0),
+            'minimum_fee': data.get('minimum_fee', 0),
+            'currency_code': data.get('currency_code', 'usd')
+        }
+
+        with scopes_disabled():
+            try:
+                product = Product.objects.get(external_id= str(item['data']['external_id']), store=store, product_type=item['data']['product_type'])
+            except Product.DoesNotExist:
+                product_serializer = ProductSerializer(data=product_data)
+            else:
+                product_serializer = ProductSerializer(product, data=product_data)
+
+            if product_serializer.is_valid():
+                product = product_serializer.save()
+                print(product.ref_id)
+                inserted_item.message = 'task processed successfully'
+                inserted_item.status = 'completed'
+            else:
+                inserted_item.errors = product_serializer.errors
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+            inserted_item.save()
+
+    return True
+
+
 def publish(doc_id):
     doc = PublishJobModel.objects.get(id=doc_id)
 
@@ -472,7 +556,9 @@ def publish(doc_id):
         for item in records:
             if item['type'] == 'schedule':
                 create_schedules(doc, item, course_provider_model)
-            if item['type'] == 'instructor':
+            elif item['type'] == 'instructor':
                 create_instructors(doc, item, course_provider_model)
+            elif item['type'] == 'product':
+                create_products(doc, item, course_provider_model)
 
         print('message processing complete')

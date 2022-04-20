@@ -8,7 +8,7 @@ initialize_django()
 
 from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway, CourseProvider
 from .mindedge import handle_mindedge_enrollment
-from .j1 import handle_j1_enrollment
+from .j1 import handle_enrollment
 
 def enroll(enrollment_data):
     payment = enrollment_data['payment']
@@ -25,11 +25,11 @@ def enroll(enrollment_data):
                                 collection='enrollment_status_history')
                     continue
 
-        elif item['erp'] == 'j1':
+        elif item['erp'] == 'j1' or item['erp'] == 'hir':
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
-            resp = handle_j1_enrollment(item['data'], item['enrollment_url'])
+            resp = handle_enrollment(item['data'], item['config'])
             cart.enrollment_request['response'] = resp
             cart.save()
         else:
@@ -41,13 +41,14 @@ def enroll(enrollment_data):
                 else:
                     continue
 
+    # this will be done in partner api, after enrollment is successful, not before.
     # if payment.amount > 0.0:
     #     try:
     #         store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
     #         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
     #     except StorePaymentGateway.DoesNotExist:
+    #         print('store payment gateway not found')
     #         pass
-
 
 def unenroll(data):
     with scopes_disabled():
