@@ -26,8 +26,6 @@ def enroll(enrollment_data):
                     continue
 
         elif item['erp'] == 'j1' or item['erp'] == 'hir':
-            # import ipdb
-            # ipdb.set_trace()
             cart = payment.cart
             cart.enrollment_request = {'request': item['data']}
             cart.save()
