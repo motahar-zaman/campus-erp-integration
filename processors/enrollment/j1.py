@@ -37,10 +37,12 @@ def handle_enrollment(data, config):
         except requests.exceptions.RequestException as err:
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
             return {'message': str(err)}
-
+    resp = {}
     try:
         resp = response.json()
     except ValueError:
+        resp = {'message': 'invalid response received'}
         save_to_mongo(data={'erp': 'j1:response', 'data': {'message': 'invalid response received'}}, collection='erp_response')
+        return resp
     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': resp}}, collection='erp_response')
     return resp
