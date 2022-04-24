@@ -15,7 +15,10 @@ from processors.notification.notification import notification_to_course_provider
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
 
-from campuslibs.loggers.mongo import save_to_mongo
+def print_log(data):
+    print('------------------------------------')
+    print(data)
+    print('------------------------------------')
 
 def requestlog_callback(ch, method, properties, body):
     data = json.loads(body.decode())
@@ -26,11 +29,11 @@ def enroll_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
     if 'enrollment' in method.routing_key:
-        save_to_mongo(data={'erp': 'test:payload', 'data': payload}, collection='erp_response')
+        print_log(payload)
         print('* Enrolling')
         formatter = EnrollmentFormatter()
         data = formatter.enroll(payload)
-        save_to_mongo(data={'erp': 'test:formatted', 'data': data}, collection='erp_response')
+        print_log(data)
         print('enrollment data formatted')
         enroll(data)
         print('Done')
