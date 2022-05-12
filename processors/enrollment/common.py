@@ -26,12 +26,20 @@ def enroll(enrollment_data):
                     continue
 
         elif item['erp'] == 'j1' or item['erp'] == 'hir':
-            cart = payment.cart
-            cart.enrollment_request = {'request': item['data']}
-            cart.save()
-            resp = handle_enrollment(item['data'], item['config'])
-            cart.enrollment_request['response'] = resp
-            cart.save()
+            # this whole thing is done this way becuase it must support
+            # multiple enrollments at once. but so far, gets only one
+            # enrollment per request
+
+            # so when enrolling in one, say j1, it works fine. but since this
+            # block is for both j1 and hir, in subsequent iteration, everything
+            # is overwritten by empty hir data.
+            if item['data']['enrollments']:
+                cart = payment.cart
+                cart.enrollment_request = {'request': item['data']}
+                cart.save()
+                resp = handle_enrollment(item['data'], item['config'])
+                cart.enrollment_request['response'] = resp
+                cart.save()
         else:
             for message_data in item['data']:
                 enrollment = message_data.pop('course_enrollment', None)

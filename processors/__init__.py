@@ -15,6 +15,10 @@ from processors.notification.notification import notification_to_course_provider
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
 
+def print_log(data):
+    print('------------------------------------')
+    print(data)
+    print('------------------------------------')
 
 def requestlog_callback(ch, method, properties, body):
     data = json.loads(body.decode())
@@ -25,9 +29,11 @@ def enroll_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
     if 'enrollment' in method.routing_key:
+        print_log(payload)
         print('* Enrolling')
         formatter = EnrollmentFormatter()
         data = formatter.enroll(payload)
+        print_log(data)
         print('enrollment data formatted')
         enroll(data)
         print('Done')
