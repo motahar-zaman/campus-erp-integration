@@ -64,17 +64,6 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
         inserted_item.save()
         return False
 
-    try:
-        data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'], inserted_item=inserted_item)
-        if not data['data']['registration_deadline']:
-            inserted_item.errors = {'registration_deadline': ['invalid date']}
-            inserted_item.status = 'failed'
-            inserted_item.message = 'error occurred'
-            inserted_item.save()
-            return False
-    except KeyError:
-        data['data']['registration_deadline'] = None
-
     data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
     with scopes_disabled():
