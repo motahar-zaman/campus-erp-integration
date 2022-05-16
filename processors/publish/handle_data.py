@@ -64,28 +64,6 @@ def create_sections(doc, data, course_provider, course_provider_model, contracts
         inserted_item.save()
         return False
 
-    # try:
-    #     data['data']['start_date'] = get_datetime_obj(data['data']['start_date'], inserted_item=inserted_item)
-    #     if not data['data']['start_date']:
-    #         inserted_item.errors = {'start_date': ['invalid date']}
-    #         inserted_item.status = 'failed'
-    #         inserted_item.message = 'error occurred'
-    #         inserted_item.save()
-    #         return False
-    # except KeyError:
-    #     data['data']['start_date'] = None
-    #
-    # try:
-    #     data['data']['end_date'] = get_datetime_obj(data['data']['end_date'], inserted_item=inserted_item)
-    #     if not data['data']['end_date']:
-    #         inserted_item.errors = {'end_date': ['invalid date']}
-    #         inserted_item.status = 'failed'
-    #         inserted_item.message = 'error occurred'
-    #         inserted_item.save()
-    #         return False
-    # except KeyError:
-    #     data['data']['end_date'] = None
-
     try:
         data['data']['registration_deadline'] = get_datetime_obj(data['data']['registration_deadline'], inserted_item=inserted_item)
         if not data['data']['registration_deadline']:
@@ -285,14 +263,6 @@ def create_schedules(doc, data, course_provider_model):
         # schedule_exist = False
         if section['external_id'] == data['parent']['section']:
             serializer = CheckSectionModelValidationSerializer(section)
-            # if serializer.data['schedules']:
-            #     for schedule_idx, schedule in enumerate(serializer.data['schedules']):
-            #         if schedule['external_id'] == str(data['data']['external_id']):
-            #             schedule_exist = True
-            #             serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
-            #     if not schedule_exist:
-            #         serializer.data['schedules'].append(schedule_serializer.data)
-            # else:
             serializer.data['schedules'].append(schedule_serializer.data)
 
             course_model.sections[section_idx] = SectionModel(**serializer.data)
@@ -326,12 +296,7 @@ def create_instructors(doc, data, course_provider_model):
         return False
 
     data['data']['provider'] = course_provider_model.id
-    # try:
-    #     instructor_model = InstructorModel.objects.get(external_id=str(data['data']['external_id']), provider=course_provider_model)
-    # except InstructorModel.DoesNotExist:
     instructor_model_serializer = InstructorModelSerializer(data=data['data'])
-    # else:
-    #     instructor_model_serializer = InstructorModelSerializer(instructor_model, data=data['data'])
 
     if instructor_model_serializer.is_valid():
         instructor_model = instructor_model_serializer.save()
@@ -348,7 +313,6 @@ def create_instructors(doc, data, course_provider_model):
 
     for section in course_model.sections:
         if section['external_id'] == data['parent']['section']:
-            # if instructor_model.id not in section['instructors']:
             serializer = CheckSectionModelValidationSerializer(section)
             serializer.data['instructors'].append(instructor_model.id)
             CourseModel.objects(
@@ -382,12 +346,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
 
             data['level'] = level
             data['provider'] = course_provider_model.id
-            # try:
-            #     course_model = CourseModel.objects.get(external_id=str(data['external_id']), provider=course_provider_model)
-            # except CourseModel.DoesNotExist:
             course_model_serializer = CourseModelSerializer(data=data)
-            # else:
-            #     course_model_serializer = CourseModelSerializer(course_model, data=data)
 
             if course_model_serializer.is_valid():
                 try:
@@ -409,12 +368,7 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
             course_data = prepare_course_postgres(course_model, course_provider)
 
             with scopes_disabled():
-                # try:
-                #     course = Course.objects.get(slug=course_data['slug'], course_provider=course_provider)
-                # except Course.DoesNotExist:
                 course_serializer = CourseSerializer(data=course_data)
-                # else:
-                #     course_serializer = CourseSerializer(course, data=course_data)
 
                 if course_serializer.is_valid():
                     course = course_serializer.save()
@@ -436,17 +390,6 @@ def create_courses(doc, course_provider, course_provider_model, records, contrac
                         store=contract.store,
                         defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
                     )
-
-                    # if not created:
-                    #     store_course_sections = StoreCourseSection.objects.filter(store_course=store_course.id)
-                    #     for object in store_course_sections:
-                    #         try:
-                    #             product = object.product
-                    #         except KeyError:
-                    #             pass
-                    #         else:
-                    #             product.title = course.title
-                    #             product.save()
 
     return True
 
