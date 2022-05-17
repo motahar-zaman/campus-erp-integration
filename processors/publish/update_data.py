@@ -44,10 +44,107 @@ from django_initializer import initialize_django
 initialize_django()
 
 class UpdateData():
+    def update_courses(self, doc, item, course_provider, course_provider_model, contracts=[]):
+        # insert every item in mongo to get status individually
+        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'course_update', 'time': timezone.now(),
+                      'message':'task is still in queue', 'status': 'pending',
+                      'external_id': str(item['match']['course'])}
+
+        log_serializer = PublishLogModelSerializer(data=mongo_data)
+
+        if log_serializer.is_valid():
+            inserted_item = log_serializer.save()
+        else:
+            print(log_serializer.errors)
+
+        data = item['data']
+        level = data.get('level', None)
+        if level not in ['beginner', 'intermediate', 'advanced']:
+            level = ''
+
+        data['level'] = level
+        data['provider'] = course_provider_model.id
+
+        try:
+            course_model = CourseModel.objects.get(external_id=str(item['match']['course']), provider=course_provider_model)
+        except CourseModel.DoesNotExist:
+            inserted_item.errors = {'course': ['course_model does not found in database']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        else:
+            course_model_serializer = CourseModelSerializer(course_model, data=data, partial=True)
+
+        if course_model_serializer.is_valid():
+            try:
+                course_model = course_model_serializer.save()
+            except NotUniqueError:
+                inserted_item.errors = {'title': ['Tried to save duplicate unique key slug from title']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+
+        else:
+            inserted_item.errors = course_model_serializer.errors
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+
+        course_data = prepare_course_postgres(course_model, course_provider)
+
+        with scopes_disabled():
+            try:
+                course = Course.objects.get(content_db_reference=course_model.id, course_provider=course_provider)
+            except Course.DoesNotExist:
+                inserted_item.errors = {'course': ['course does not found']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+            else:
+                course_serializer = CourseSerializer(course, data=course_data, partial=True)
+
+            if course_serializer.is_valid():
+                course = course_serializer.save()
+                inserted_item.message = 'task processed successfully'
+                inserted_item.status = 'completed'
+                inserted_item.save()
+
+            else:
+                inserted_item.errors = course_serializer.errors
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+
+            # create StoreCourse
+            for contract in contracts:
+                store_course, created = StoreCourse.objects.get_or_create(
+                    course=course,
+                    store=contract.store,
+                    defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
+                )
+                if not created:
+                    store_course_sections = StoreCourseSection.objects.filter(store_course=store_course.id)
+                    for object in store_course_sections:
+                        try:
+                            product = object.product
+                        except KeyError:
+                            pass
+                        else:
+                            product.title = course.title
+                            product.save()
+
+        return True
+
+
     def update_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data']['external_id']}
+        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section_update', 'time': timezone.now(),
+                      'message': 'task is still in queue', 'status': 'pending', 'external_id': str(data['match']['section'])}
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -56,14 +153,20 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id=data['parent']['course'], provider=course_provider_model)
+            course_model = CourseModel.objects.get(external_id=str(data['match']['course']), provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in section']}
+            inserted_item.errors = {'parent': ['corresponding course model does not found']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
             return False
+
+        section_model_data = None
+        for section in course_model.sections:
+            if section.external_id == data['match']['section']:
+                section_model_data = section
+                break
 
         data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
@@ -72,14 +175,14 @@ class UpdateData():
                 course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
             except Course.DoesNotExist:
                 # without that we can not proceed comfortably
-                inserted_item.errors = {'parent': ['corresponding course does not found in database']}
+                inserted_item.errors = {'parent': ['corresponding course does not found']}
                 inserted_item.status = 'failed'
                 inserted_item.message = 'error occurred'
                 inserted_item.save()
                 return False
         # now update the sections in mongo
 
-        section_model_serializer = CheckSectionModelValidationSerializer(data=data['data'])
+        section_model_serializer = CheckSectionModelValidationSerializer(section_model_data, data=data['data'], partial=True)
         if section_model_serializer.is_valid():
             pass
         else:
@@ -91,23 +194,37 @@ class UpdateData():
 
         if course_model.sections:
             for section_idx, sec_data in enumerate(course_model.sections):
-                if sec_data['external_id'] == section_model_serializer.data['external_id']:
+                if sec_data['external_id'] == str(data['match']['section']):
                     new_section_data = sec_data.to_mongo().to_dict()
                     new_section_data.update(section_model_serializer.data)
                     course_model.sections[section_idx] = SectionModel(**new_section_data)
                     course_model.save()
                     break
             else:
-                CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+                inserted_item.errors = {'section': ['section does not found in course model']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
         else:
-            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+            inserted_item.errors = {'parent': ['no section found with the corresponding course']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+
         course_model.reload()
         section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
+
         with scopes_disabled():
             try:
-                section = course.sections.get(name=section_data['name'])
+                section = course.sections.get(name=section_model_data['code'])
             except Section.DoesNotExist:
-                serializer = SectionSerializer(data=section_data)
+                inserted_item.errors = {'section': ['section does not found in course']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
             else:
                 serializer = SectionSerializer(section, data=section_data)
 
@@ -186,13 +303,14 @@ class UpdateData():
                                 )
                             except Exception:
                                 pass
+        return True
 
 
     def update_schedules(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule', 'time': timezone.now(),
+        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_update', 'time': timezone.now(),
                       'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['data']['external_id']}
+                      'external_id': str(data['match']['schedule'])}
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -201,10 +319,14 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
+            course_model = CourseModel.objects.get(
+                external_id=str(data['match']['course']),
+                sections__external_id=str(data['match']['section']),
+                provider=course_provider_model
+            )
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in schedule']}
+            inserted_item.errors = {'parent': ['corresponding course does not found']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -218,28 +340,6 @@ class UpdateData():
             inserted_item.save()
             return False
 
-        try:
-            data['data']['start_at'] = get_datetime_obj(data['data']['start_at'], inserted_item=inserted_item)
-            if not data['data']['start_at']:
-                inserted_item.errors = {'start_at': ['invalid date']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-        except KeyError:
-            data['data']['start_at'] = None
-
-        try:
-            data['data']['end_at'] = get_datetime_obj(data['data']['end_at'], inserted_item=inserted_item)
-            if not data['data']['end_at']:
-                inserted_item.errors = {'end_at': ['invalid date']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-        except KeyError:
-            data['data']['end_at'] = None
-
         # check if the provided data is valid. if not, abort.
         schedule_serializer = SectionScheduleModelSerializer(data=data['data'])
         if not schedule_serializer.is_valid():
@@ -250,10 +350,25 @@ class UpdateData():
             return False
 
         for section_idx, section in enumerate(course_model.sections):
-            # schedule_exist = False
-            if section['external_id'] == data['parent']['section']:
+            if section['external_id'] == str(data['match']['section']):
                 serializer = CheckSectionModelValidationSerializer(section)
-                serializer.data['schedules'].append(schedule_serializer.data)
+                if serializer.data['schedules']:
+                    for schedule_idx, schedule in enumerate(serializer.data['schedules']):
+                        if schedule['external_id'] == str(data['match']['schedule']):
+                            serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
+                            break
+                    else:
+                        inserted_item.errors = {'schedule': ['schedule not found']}
+                        inserted_item.status = 'failed'
+                        inserted_item.message = 'error occurred'
+                        inserted_item.save()
+                        return False
+                else:
+                    inserted_item.errors = {'schedule': ['no schedule found with the section']}
+                    inserted_item.status = 'failed'
+                    inserted_item.message = 'error occurred'
+                    inserted_item.save()
+                    return False
 
                 course_model.sections[section_idx] = SectionModel(**serializer.data)
                 course_model.save()
@@ -262,12 +377,14 @@ class UpdateData():
                 inserted_item.save()
                 break
 
+        return True
+
 
     def update_instructors(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor', 'time': timezone.now(),
+        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_update', 'time': timezone.now(),
                       'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['data']['external_id']}
+                      'external_id': str(data['match']['instructor'])}
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -276,17 +393,31 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
+            course_model = CourseModel.objects.get(
+                external_id=str(data['match']['course']), sections__external_id=str(data['match']['section']),
+                provider=course_provider_model
+            )
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in instructor']}
+            inserted_item.errors = {'parent': ['corresponding course does not found']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
             return False
 
         data['data']['provider'] = course_provider_model.id
-        instructor_model_serializer = InstructorModelSerializer(data=data['data'])
+        try:
+            instructor_model = InstructorModel.objects.get(
+                external_id=str(data['match']['instructor']), provider=course_provider_model
+            )
+        except InstructorModel.DoesNotExist:
+            inserted_item.errors = {'instructor': ['instructor does not found']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        else:
+            instructor_model_serializer = InstructorModelSerializer(instructor_model, data=data['data'], partial=True)
 
         if instructor_model_serializer.is_valid():
             instructor_model = instructor_model_serializer.save()
@@ -301,94 +432,14 @@ class UpdateData():
             inserted_item.save()
             return False
 
-        for section in course_model.sections:
-            if section['external_id'] == data['parent']['section']:
-                serializer = CheckSectionModelValidationSerializer(section)
-                serializer.data['instructors'].append(instructor_model.id)
-                CourseModel.objects(
-                    id=course_model.id,
-                    external_id=data['parent']['course'],
-                    sections__external_id=data['parent']['section'],
-                ).update_one(set__sections__S=SectionModel(**serializer.data))
-
-        return True
-
-
-    def update_courses(self, doc, course_provider, course_provider_model, records, contracts=[]):
-        for item in records:
-            if item['type'] == 'course':
-                # insert every item in mongo to get status individually
-                mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'course', 'time': timezone.now(),
-                              'message':'task is still in queue', 'status': 'pending',
-                              'external_id': item['data']['external_id']}
-
-                log_serializer = PublishLogModelSerializer(data=mongo_data)
-
-                if log_serializer.is_valid():
-                    inserted_item = log_serializer.save()
-                else:
-                    print(log_serializer.errors)
-
-                data = item['data']
-                level = data.get('level', None)
-                if level not in ['beginner', 'intermediate', 'advanced']:
-                    level = ''
-
-                data['level'] = level
-                data['provider'] = course_provider_model.id
-                course_model_serializer = CourseModelSerializer(data=data)
-
-                if course_model_serializer.is_valid():
-                    try:
-                        course_model = course_model_serializer.save()
-                    except NotUniqueError:
-                        inserted_item.errors = {'title': ['Tried to save duplicate unique key slug from title']}
-                        inserted_item.status = 'failed'
-                        inserted_item.message = 'error occurred'
-                        inserted_item.save()
-                        continue
-
-                else:
-                    inserted_item.errors = course_model_serializer.errors
-                    inserted_item.status = 'failed'
-                    inserted_item.message = 'error occurred'
-                    inserted_item.save()
-                    continue
-
-                course_data = prepare_course_postgres(course_model, course_provider)
-
-                with scopes_disabled():
-                    course_serializer = CourseSerializer(data=course_data)
-
-                    if course_serializer.is_valid():
-                        course = course_serializer.save()
-                        inserted_item.message = 'task processed successfully'
-                        inserted_item.status = 'completed'
-                        inserted_item.save()
-
-                    else:
-                        inserted_item.errors = course_serializer.errors
-                        inserted_item.status = 'failed'
-                        inserted_item.message = 'error occurred'
-                        inserted_item.save()
-                        continue
-
-                    # create StoreCourse
-                    for contract in contracts:
-                        store_course, created = StoreCourse.objects.get_or_create(
-                            course=course,
-                            store=contract.store,
-                            defaults={'enrollment_ready': True, 'is_featured': False, 'is_published': False}
-                        )
-
         return True
 
 
     def update_products(self, doc, item, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product', 'time': timezone.now(),
+        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product_update', 'time': timezone.now(),
                       'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': item['data']['external_id']}
+                      'external_id': str(data['match']['product'])}
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -426,11 +477,18 @@ class UpdateData():
 
             with scopes_disabled():
                 try:
-                    product = Product.objects.get(external_id= str(item['data']['external_id']), store=store, product_type=item['data']['product_type'])
+                    product = Product.objects.get(
+                        external_id= str(item['match']['product']), store=store,
+                        product_type=item['data']['product_type']
+                    )
                 except Product.DoesNotExist:
-                    product_serializer = ProductSerializer(data=product_data)
+                    inserted_item.errors = {'product': ['corresponding product does not found']}
+                    inserted_item.status = 'failed'
+                    inserted_item.message = 'error occurred'
+                    inserted_item.save()
+                    return False
                 else:
-                    product_serializer = ProductSerializer(product, data=product_data)
+                    product_serializer = ProductSerializer(product, data=product_data, partial=True)
 
                 if product_serializer.is_valid():
                     product = product_serializer.save()

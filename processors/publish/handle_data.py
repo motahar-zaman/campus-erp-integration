@@ -109,7 +109,7 @@ def publish(doc_id):
             update_data = UpdateData()
             for item in records:
                 if item['type'] == 'course':
-                    update_data.update_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
+                    update_data.update_courses(doc, item, course_provider, course_provider_model, contracts=contracts)
 
                 elif item['type'] == 'section':
                     update_data.update_sections(doc, item, course_provider, course_provider_model, contracts=contracts)
