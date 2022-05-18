@@ -38,6 +38,7 @@ from django.utils import timezone
 from processors.publish.create_data import CreateData
 from processors.publish.update_data import UpdateData
 from processors.publish.deactivate_data import DeactivateData
+from processors.publish.store_course_publish import StoreCoursePublish
 
 from django_scopes import scopes_disabled
 from models.publish.publish_job import PublishJob as PublishJobModel
@@ -87,6 +88,7 @@ def publish(doc_id):
 
         if action == "record_add":
             create_data = CreateData()
+            publish_course = StoreCoursePublish()
             create_data.create_courses(doc, course_provider, course_provider_model, records, contracts=contracts)
             # since schedules and instructors are embedded into sections, we will create sections first
 
@@ -105,8 +107,19 @@ def publish(doc_id):
                 elif item['type'] == 'product':
                     create_data.create_products(doc, item, course_provider_model)
 
+            for item in records:
+                if item['type'] == 'course':
+                    is_published = False
+                    try:
+                        is_published = item['data']['is_published']
+                    except KeyError:
+                        pass
+                    if is_published:
+                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
+
         elif action == "record_update":
             update_data = UpdateData()
+            publish_course = StoreCoursePublish()
             for item in records:
                 if item['type'] == 'course':
                     update_data.update_courses(doc, item, course_provider, course_provider_model, contracts=contracts)
@@ -122,6 +135,16 @@ def publish(doc_id):
 
                 elif item['type'] == 'product':
                     update_data.update_products(doc, item, course_provider_model)
+
+            for item in records:
+                if item['type'] == 'course':
+                    is_published = False
+                    try:
+                        is_published = item['data']['is_published']
+                    except KeyError:
+                        pass
+                    if is_published:
+                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model, contracts=contracts)
 
 
         elif action == "record_delete":
