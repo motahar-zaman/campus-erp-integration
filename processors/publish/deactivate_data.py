@@ -253,7 +253,7 @@ class DeactivateData():
             if section.external_id == data['match']['section']:
                 schedules = section.schedules
                 for idx, schedule in enumerate(section.schedules):
-                    if schedule.external_id == data['match']['external_id']:
+                    if schedule.external_id == data['match']['schedule']:
                         schedules.pop(idx)
                         course_model.sections[section_idx].schedules = schedules
                         course_model.save()
@@ -292,7 +292,7 @@ class DeactivateData():
             return False
 
         try:
-            instructor_model = InstructorModel.objects.get(external_id=data['match']['external_id'], provider=course_provider.content_db_reference)
+            instructor_model = InstructorModel.objects.get(external_id=data['match']['instructor'], provider=course_provider.content_db_reference)
         except InstructorModel.DoesNotExist:
             inserted_item.errors = {'course_model': ['instructor does not found in database']}
             inserted_item.status = 'failed'
