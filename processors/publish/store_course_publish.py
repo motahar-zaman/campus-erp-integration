@@ -1,45 +1,16 @@
-from mongoengine import get_db, connect, disconnect
-from bson import ObjectId
 from decouple import config
-from .helpers import (
-    get_datetime_obj,
-    prepare_course_postgres,
-    get_execution_site,
-    get_instructors,
-    get_schedules,
-    prepare_section_mongo,
-    prepare_section_postgres,
-    transale_j1_data,
-    write_status,
-    write_log,
-    insert_into_mongo,
-    get_data,
-    es_course_unpublish
-)
+from .serializers import PublishLogModelSerializer
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer,\
-    CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer,\
-    PublishLogModelSerializer, ProductSerializer
-
-from config.mongo_client import connect_mongodb, disconnect_mongodb
-
-from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store, RelatedProduct
-from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
-from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
-from models.courseprovider.instructor import Instructor as InstructorModel
+from shared_models.models import Course, Section, CourseSharingContract, StoreCourse, Product, StoreCourseSection,\
+    Store, SharedCourse
 from models.course.course import Course as CourseModel
-from models.course.section import Section as SectionModel
 from models.log.publish_log import PublishLog as PublishLogModel
-from datetime import datetime
-import decimal
+
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 import requests
 
 from django_scopes import scopes_disabled
-from models.publish.publish_job import PublishJob as PublishJobModel
-from mongoengine import NotUniqueError
 from django.db import transaction
 from django_initializer import initialize_django
 
@@ -49,7 +20,7 @@ class StoreCoursePublish():
     def course_publish_in_stores(self, doc, data, course_provider, course_provider_model):
         for store_slug in data['publishing_stores']:
             # insert every item in mongo to get status individually
-            mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_publishing', 'time': timezone.now(),
+            mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_publishing_'+store_slug, 'time': timezone.now(),
                           'message': 'task is still in queue', 'status': 'pending', 'external_id': str(data['data']['external_id'])}
 
             log_serializer = PublishLogModelSerializer(data=mongo_data)
@@ -145,8 +116,8 @@ class StoreCoursePublish():
                                     quantity_sold=0,
                                     available_quantity=section.seat_capacity,
                                     tax_code=config('AVATAX_TAX_CODE', 'ST080031'),
-                                    fee=item['fee'],
-                                    minimum_fee=item['fee'],
+                                    fee=section.fee,
+                                    minimum_fee=section.fee,
                                     currency_code='usd'
                                 )
 
@@ -196,6 +167,8 @@ class StoreCoursePublish():
             # update the course object in mongodb too
             course_obj._is_published = is_published
             course_obj.save()
+            course.content_ready = True
+            course.save()
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'
             inserted_item.save()
@@ -203,15 +176,15 @@ class StoreCoursePublish():
             # update the record into elasticsearech too
 
             if is_published:
-                es_course_publish(store_course)
+                self.es_course_publish(store_course)
             else:
-                es_course_unpublish(store_course)
+                self.es_course_unpublish(store_course)
 
         return True
 
 
 
-    def es_course_publish(store_course):
+    def es_course_publish(self, store_course):
         '''
         checks if the course already exists or not. if it does, the id of the store in which the course is being published is
         appended to course['stores'] list. else a new course is created
@@ -243,14 +216,12 @@ class StoreCoursePublish():
 
         else:
             mongo_course = CourseModel.objects.get(id=store_course.course.content_db_reference)
-
-            course_data = GetCourseModelSerializer(mongo_course).data
             payload = {
                 'title': store_course.course.title,
                 'sortable_title': store_course.course.title,
-                'description': course_data['description'],
-                'skills': course_data['skills'],
-                'careers': course_data['careers'],
+                'description': mongo_course.description,
+                'skills': mongo_course.skills,
+                'careers': mongo_course.careers,
                 'online': True,
                 'self_paced': False,
                 'provider_id': str(store_course.course.course_provider.content_db_reference),
@@ -266,7 +237,7 @@ class StoreCoursePublish():
         return resp
 
 
-    def es_course_unpublish(store_course):
+    def es_course_unpublish(self, store_course):
         '''
         checks the stores key in the course object and removes the store id of the store from which the course is being unpublished.
         if the store id is the sole item, then the whole key is removed
