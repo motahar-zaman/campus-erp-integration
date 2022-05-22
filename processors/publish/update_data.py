@@ -170,8 +170,10 @@ class UpdateData():
             if section.external_id == data['match']['section']:
                 section_model_data = section
                 break
-
-        data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
+        section_model_code = section_model_data['code']
+        course_fee = data['data'].get('fee', None)
+        if course_fee:
+            data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
         with scopes_disabled():
             try:
@@ -186,8 +188,9 @@ class UpdateData():
         # now update the sections in mongo
 
         section_model_serializer = CheckSectionModelValidationSerializer(section_model_data, data=data['data'], partial=True)
+
         if section_model_serializer.is_valid():
-            pass
+            section_model_serializer.save()
         else:
             inserted_item.errors = section_model_serializer.errors
             inserted_item.status = 'failed'
@@ -210,7 +213,7 @@ class UpdateData():
                 inserted_item.save()
                 return False
         else:
-            inserted_item.errors = {'parent': ['no section found with the corresponding course']}
+            inserted_item.errors = {'section': ['no section found with the corresponding course']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -221,7 +224,7 @@ class UpdateData():
 
         with scopes_disabled():
             try:
-                section = course.sections.get(name=section_model_data['code'])
+                section = course.sections.get(name=section_model_code)
             except Section.DoesNotExist:
                 inserted_item.errors = {'section': ['section does not found in course']}
                 inserted_item.status = 'failed'
@@ -229,7 +232,7 @@ class UpdateData():
                 inserted_item.save()
                 return False
             else:
-                serializer = SectionSerializer(section, data=section_data)
+                serializer = SectionSerializer(section, data=section_data, partial=True)
 
             if serializer.is_valid():
                 section = serializer.save()
