@@ -46,9 +46,10 @@ initialize_django()
 class UpdateData():
     def update_courses(self, doc, item, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'course_update', 'time': timezone.now(),
-                      'message':'task is still in queue', 'status': 'pending',
-                      'external_id': str(item['match']['course'])}
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'course_update', 'time': timezone.now(),
+            'message':'task is still in queue', 'status': 'pending', 'external_id': item['match'].get('course', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
 
@@ -143,8 +144,10 @@ class UpdateData():
 
     def update_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending', 'external_id': str(data['match']['section'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'section_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('section', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -308,9 +311,10 @@ class UpdateData():
 
     def update_schedules(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['schedule'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('schedule', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -382,9 +386,10 @@ class UpdateData():
 
     def update_instructors(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['instructor'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('instructor', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -437,9 +442,10 @@ class UpdateData():
 
     def update_products(self, doc, item, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['product'])}
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'product_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('product', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
