@@ -166,11 +166,14 @@ class UpdateData():
             return False
 
         section_model_data = None
+        section_model_code = None
+
         for section in course_model.sections:
-            if section.external_id == data['match']['section']:
+            if section.external_id == str(data['match']['section']):
                 section_model_data = section
+                section_model_code = section_model_data['code']
                 break
-        section_model_code = section_model_data['code']
+
         course_fee = data['data'].get('fee', None)
         if course_fee:
             data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
@@ -204,7 +207,6 @@ class UpdateData():
                     new_section_data = sec_data.to_mongo().to_dict()
                     new_section_data.update(section_model_serializer.data)
                     course_model.sections[section_idx] = SectionModel(**new_section_data)
-                    course_model.save()
                     break
             else:
                 inserted_item.errors = {'section': ['section does not found in course model']}
@@ -219,7 +221,7 @@ class UpdateData():
             inserted_item.save()
             return False
 
-        course_model.reload()
+
         section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
 
         with scopes_disabled():
@@ -236,6 +238,7 @@ class UpdateData():
 
             if serializer.is_valid():
                 section = serializer.save()
+                course_model.save()
                 inserted_item.message = 'task processed successfully'
                 inserted_item.status = 'completed'
                 inserted_item.save()
