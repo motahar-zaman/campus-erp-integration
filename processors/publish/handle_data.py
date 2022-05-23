@@ -107,6 +107,9 @@ def publish(doc_id):
                 elif item['type'] == 'product':
                     create_data.create_products(doc, item, course_provider_model)
 
+                elif item['type'] == 'subject':
+                    create_data.create_and_update_subjects(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
                     is_published = False
