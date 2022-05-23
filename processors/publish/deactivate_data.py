@@ -46,9 +46,10 @@ initialize_django()
 class DeactivateData():
     def deactivate_course(self, doc, course_provider, course_provider_model, data):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_delete', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['match']['course']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'course_delete', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending','external_id': data['match'].get('course', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -58,13 +59,22 @@ class DeactivateData():
 
         with scopes_disabled():
             try:
-                course_model = CourseModel.objects.get(external_id = data['match']['course'], provider = course_provider.content_db_reference)
+                course_model = CourseModel.objects.get(
+                    external_id = data['match']['course'],
+                    provider = course_provider.content_db_reference
+                )
             except CourseModel.DoesNotExist:
                 inserted_item.errors = {'course_model': ['course_model does not found in database']}
                 inserted_item.status = 'failed'
                 inserted_item.message = 'error occurred'
                 inserted_item.save()
+                return False
 
+            except KeyError:
+                inserted_item.errors = {'match': ['course external_id not found in payload match object']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
                 return False
 
             try:
@@ -74,7 +84,6 @@ class DeactivateData():
                 inserted_item.status = 'failed'
                 inserted_item.message = 'error occurred'
                 inserted_item.save()
-
                 return False
 
         contracts = CourseSharingContract.objects.filter(course_provider=course_provider, is_active=True)
@@ -128,9 +137,10 @@ class DeactivateData():
 
     def deactivate_section(self, doc, course_provider, course_provider_model, data):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section_delete', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['match']['course']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'section_delete', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('section', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -140,7 +150,10 @@ class DeactivateData():
 
         with scopes_disabled():
             try:
-                course_model = CourseModel.objects.get(external_id = data['match']['course'], provider = course_provider.content_db_reference)
+                course_model = CourseModel.objects.get(
+                    external_id = data['match']['course'],
+                    provider = course_provider.content_db_reference
+                )
             except CourseModel.DoesNotExist:
                 inserted_item.errors = {'course_model': ['course_model does not found in database']}
                 inserted_item.status = 'failed'
@@ -230,9 +243,10 @@ class DeactivateData():
 
     def deactivate_schedule(self, doc, course_provider, course_provider_model, data):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_delete', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['match']['course']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_delete', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending','external_id': data['match'].get('schedule', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -241,7 +255,10 @@ class DeactivateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id = data['match']['course'], provider = course_provider.content_db_reference)
+            course_model = CourseModel.objects.get(
+                external_id = data['match']['course'],
+                provider = course_provider.content_db_reference
+            )
         except CourseModel.DoesNotExist:
             inserted_item.errors = {'course_model': ['course_model does not found in database']}
             inserted_item.status = 'failed'
@@ -272,9 +289,10 @@ class DeactivateData():
 
     def deactivate_instructor(self, doc, course_provider, course_provider_model, data):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_delete', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['match']['course']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_delete', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('instructor', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -283,7 +301,10 @@ class DeactivateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id = data['match']['course'], provider = course_provider.content_db_reference)
+            course_model = CourseModel.objects.get(
+                external_id = data['match']['course'],
+                provider = course_provider.content_db_reference
+            )
         except CourseModel.DoesNotExist:
             inserted_item.errors = {'course_model': ['course_model does not found in database']}
             inserted_item.status = 'failed'
@@ -291,37 +312,47 @@ class DeactivateData():
             inserted_item.save()
             return False
 
-        try:
-            instructor_model = InstructorModel.objects.get(external_id=data['match']['instructor'], provider=course_provider.content_db_reference)
-        except InstructorModel.DoesNotExist:
-            inserted_item.errors = {'course_model': ['instructor does not found in database']}
-            inserted_item.status = 'failed'
-            inserted_item.message = 'error occurred'
-            inserted_item.save()
-            return False
-        except InstructorModel.MultipleObjectsReturned:
-            inserted_item.errors = {'course_model': ['multiple instructor exists in database']}
-            inserted_item.status = 'failed'
-            inserted_item.message = 'error occurred'
-            inserted_item.save()
-            return False
+        # try:
+        #     instructor_model = InstructorModel.objects.get(
+        #         external_id=data['match']['instructor'],
+        #         provider=course_provider.content_db_reference
+        #     )
+        # except InstructorModel.DoesNotExist:
+        #     inserted_item.errors = {'course_model': ['instructor does not found in database']}
+        #     inserted_item.status = 'failed'
+        #     inserted_item.message = 'error occurred'
+        #     inserted_item.save()
+        #     return False
+        # except InstructorModel.MultipleObjectsReturned:
+        #     inserted_item.errors = {'course_model': ['multiple instructor exists in database']}
+        #     inserted_item.status = 'failed'
+        #     inserted_item.message = 'error occurred'
+        #     inserted_item.save()
+        #     return False
+
+        instructor_models = InstructorModel.objects.filter(external_id=data['match']['instructor'], provider=course_provider.content_db_reference)
 
         for section_idx, section in enumerate(course_model.sections):
             if section.external_id == data['match']['section']:
                 instructors = section.instructors
                 for idx, instructor in enumerate(section.instructors):
-                    if instructor == instructor_model:
+                    if instructor in instructor_models:
                         instructors.pop(idx)
-                        course_model.sections[section_idx].instructors = instructors
-                        course_model.save()
+                course_model.sections[section_idx].instructors = instructors
+        course_model.save()
 
-                        inserted_item.message = 'task processed successfully'
-                        inserted_item.status = 'completed'
-                        inserted_item.save()
-                        return True
+                        # inserted_item.message = 'task processed successfully'
+                        # inserted_item.status = 'completed'
+                        # inserted_item.save()
+                        # return True
 
-        inserted_item.errors = {'course_model': ['matching instructor does not found in database']}
-        inserted_item.status = 'failed'
-        inserted_item.message = 'error occurred'
+        # inserted_item.errors = {'course_model': ['matching instructor does not found in database']}
+        # inserted_item.status = 'failed'
+        # inserted_item.message = 'error occurred'
+        # inserted_item.save()
+        # return False
+
+        inserted_item.message = 'task processed successfully'
+        inserted_item.status = 'completed'
         inserted_item.save()
-        return False
+        return True

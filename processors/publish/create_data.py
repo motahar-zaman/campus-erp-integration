@@ -49,9 +49,11 @@ class CreateData():
         for item in records:
             if item['type'] == 'course':
                 # insert every item in mongo to get status individually
-                mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'course_create', 'time': timezone.now(),
-                              'message':'task is still in queue', 'status': 'pending',
-                              'external_id': item['data']['external_id']}
+                mongo_data = {
+                    'data': item, 'publish_job_id': doc['id'], 'type': 'course_create', 'time': timezone.now(),
+                    'message':'task is still in queue', 'status': 'pending',
+                    'external_id': item['data'].get('external_id', '')
+                }
 
                 log_serializer = PublishLogModelSerializer(data=mongo_data)
 
@@ -117,8 +119,10 @@ class CreateData():
 
     def create_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section_create', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data']['external_id']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'section_create', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data'].get('external_id', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -261,9 +265,10 @@ class CreateData():
 
     def create_schedules(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_create', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['data']['external_id']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_create', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data'].get('external_id', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -336,9 +341,10 @@ class CreateData():
 
     def create_instructors(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_create', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': data['data']['external_id']}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_create', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data'].get('external_id', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -387,9 +393,10 @@ class CreateData():
 
     def create_products(self, doc, item, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product_create', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': item['data']['external_id']}
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'product_create', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
