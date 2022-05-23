@@ -46,9 +46,10 @@ initialize_django()
 class UpdateData():
     def update_courses(self, doc, item, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'course_update', 'time': timezone.now(),
-                      'message':'task is still in queue', 'status': 'pending',
-                      'external_id': str(item['match']['course'])}
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'course_update', 'time': timezone.now(),
+            'message':'task is still in queue', 'status': 'pending', 'external_id': item['match'].get('course', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
 
@@ -143,8 +144,10 @@ class UpdateData():
 
     def update_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'section_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending', 'external_id': str(data['match']['section'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'section_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('section', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -163,12 +166,17 @@ class UpdateData():
             return False
 
         section_model_data = None
+        section_model_code = None
+
         for section in course_model.sections:
-            if section.external_id == data['match']['section']:
+            if section.external_id == str(data['match']['section']):
                 section_model_data = section
+                section_model_code = section_model_data['code']
                 break
 
-        data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
+        course_fee = data['data'].get('fee', None)
+        if course_fee:
+            data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
         with scopes_disabled():
             try:
@@ -183,8 +191,9 @@ class UpdateData():
         # now update the sections in mongo
 
         section_model_serializer = CheckSectionModelValidationSerializer(section_model_data, data=data['data'], partial=True)
+
         if section_model_serializer.is_valid():
-            pass
+            section_model_serializer.save()
         else:
             inserted_item.errors = section_model_serializer.errors
             inserted_item.status = 'failed'
@@ -198,7 +207,6 @@ class UpdateData():
                     new_section_data = sec_data.to_mongo().to_dict()
                     new_section_data.update(section_model_serializer.data)
                     course_model.sections[section_idx] = SectionModel(**new_section_data)
-                    course_model.save()
                     break
             else:
                 inserted_item.errors = {'section': ['section does not found in course model']}
@@ -207,18 +215,18 @@ class UpdateData():
                 inserted_item.save()
                 return False
         else:
-            inserted_item.errors = {'parent': ['no section found with the corresponding course']}
+            inserted_item.errors = {'section': ['no section found with the corresponding course']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
             return False
 
-        course_model.reload()
+
         section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
 
         with scopes_disabled():
             try:
-                section = course.sections.get(name=section_model_data['code'])
+                section = course.sections.get(name=section_model_code)
             except Section.DoesNotExist:
                 inserted_item.errors = {'section': ['section does not found in course']}
                 inserted_item.status = 'failed'
@@ -226,10 +234,11 @@ class UpdateData():
                 inserted_item.save()
                 return False
             else:
-                serializer = SectionSerializer(section, data=section_data)
+                serializer = SectionSerializer(section, data=section_data, partial=True)
 
             if serializer.is_valid():
                 section = serializer.save()
+                course_model.save()
                 inserted_item.message = 'task processed successfully'
                 inserted_item.status = 'completed'
                 inserted_item.save()
@@ -308,9 +317,10 @@ class UpdateData():
 
     def update_schedules(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['schedule'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'schedule_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('schedule', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -382,9 +392,10 @@ class UpdateData():
 
     def update_instructors(self, doc, data, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['instructor'])}
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'instructor_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('instructor', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():
@@ -437,9 +448,10 @@ class UpdateData():
 
     def update_products(self, doc, item, course_provider_model):
         # insert every item in mongo to get status individually
-        mongo_data = {'data': item, 'publish_job_id': doc['id'], 'type': 'product_update', 'time': timezone.now(),
-                      'message': 'task is still in queue', 'status': 'pending',
-                      'external_id': str(data['match']['product'])}
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'product_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['match'].get('product', '')
+        }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
         if log_serializer.is_valid():

@@ -182,7 +182,7 @@ def prepare_section_postgres(data, fee, course, course_model):
         'execution_mode': data.get('execution_mode', 'self-paced'),
         'registration_deadline': get_datetime_obj(data.get('registration_deadline')),
         'content_db_reference': str(course_model.id),
-        'is_active': data.get('is_active', False),
+        'is_active': data.get('is_active', True),
         'start_date': get_datetime_obj(data.get('start_date')),
         'end_date': get_datetime_obj(data.get('end_date')),
         'execution_site': data.get('execution_site'),
