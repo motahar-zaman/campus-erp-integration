@@ -469,6 +469,8 @@ class CreateData():
             print(log_serializer.errors)
 
         data = item['data']
+        data['slug'] = slugify(data['title'])
+        data['from_importer'] = True
 
         courses = []
         #getting course from given course external_id
@@ -508,7 +510,6 @@ class CreateData():
                 continue
             else:
                 data['store'] = str(store.id)
-                data['slug'] = slugify(data['title'])
 
             with scopes_disabled():
                 try:
