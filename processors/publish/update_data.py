@@ -19,12 +19,12 @@ from .helpers import (
 
 from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer,\
     CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer,\
-    PublishLogModelSerializer, ProductSerializer
+    PublishLogModelSerializer, ProductSerializer, CourseCatalogSerializer, CatalogSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store, RelatedProduct
+    StoreCourseSection, Store, RelatedProduct, CourseCatalog, Catalog
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -34,6 +34,7 @@ from models.log.publish_log import PublishLog as PublishLogModel
 from datetime import datetime
 import decimal
 from django.utils import timezone
+from django.utils.text import slugify
 
 from django_scopes import scopes_disabled
 from models.publish.publish_job import PublishJob as PublishJobModel
@@ -512,5 +513,114 @@ class UpdateData():
                     inserted_item.status = 'failed'
                     inserted_item.message = 'error occurred'
                 inserted_item.save()
+
+        return True
+
+
+    def update_subjects(self, doc, item, course_provider, course_provider_model):
+        # insert every item in mongo to get status individually
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
+        }
+
+        log_serializer = PublishLogModelSerializer(data=mongo_data)
+        if log_serializer.is_valid():
+            inserted_item = log_serializer.save()
+        else:
+            print(log_serializer.errors)
+
+        data = item['data']
+        catalog_slug = slugify(item['match'].get('title', ''))
+        store_slug = item['match'].get('store', '')
+
+        if data.get('title', False):
+            data['slug'] = slugify(data['title'])
+
+
+        courses = []
+        #getting courses from given course external_id
+        for tagging_course in item['related_records']:
+            if tagging_course.get('type', '') == 'course':
+                try:
+                    course_model = CourseModel.objects.get(
+                        external_id=tagging_course.get('external_id', ''),
+                        provider=course_provider_model
+                    )
+                except CourseModel.DoesNotExist:
+                    pass
+                else:
+                    with scopes_disabled():
+                        try:
+                            course = Course.objects.get(
+                                content_db_reference=str(course_model.id),
+                                course_provider=course_provider
+                            )
+                        except Course.DoesNotExist:
+                            pass
+                        else:
+                            courses.append(course)
+
+        # find out the catalog and update accordingly
+        try:
+            store = Store.objects.get(url_slug=store_slug)
+        except Store.DoesNotExist:
+            inserted_item.errors[store_slug] = ['corresponding store does not found in database']
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        else:
+            with scopes_disabled():
+                try:
+                    catalog = Catalog.objects.get(store=store.id, slug=catalog_slug)
+                except Catalog.DoesNotExist:
+                    inserted_item.errors[store_slug] = ['corresponding catalog does not found in database']
+                    inserted_item.status = 'failed'
+                    inserted_item.message = 'error occurred'
+                    inserted_item.save()
+                    return False
+                else:
+                    catalog_serializer = CatalogSerializer(catalog, data=data, partial=True)
+
+                    if catalog_serializer.is_valid():
+                        catalog = catalog_serializer.save()
+                        inserted_item.errors[store_slug] = ['subject updated successfully']
+                        inserted_item.message = 'task processed successfully'
+                        inserted_item.status = 'completed'
+                        inserted_item.save()
+
+                        # first delete all course catalog for this catalog
+                        course_catalog = CourseCatalog.objects.filter(catalog=catalog)
+                        course_catalog.delete()
+
+                        # then create course catalogs for all the given courses with this catalog
+                        for course in courses:
+                            try:
+                                store_course = StoreCourse.objects.get(course=course, store=store)
+                            except Catalog.StoreCourse:
+                                inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
+                                inserted_item.save()
+
+                            else:
+                                course_catalog_serializer = CourseCatalogSerializer(
+                                    data={'catalog': catalog.id, 'store_course': store_course.id}
+                                )
+                                if course_catalog_serializer.is_valid():
+                                    course_catalog_serializer.save()
+                                    inserted_item.errors[store_slug + '_course_catalog'] = ['course_catalog created successfully']
+                                    inserted_item.message = 'task processed successfully'
+                                    inserted_item.status = 'completed'
+                                    inserted_item.save()
+                                else:
+                                    inserted_item.errors[store_slug + '_course_catalog'] = course_catalog_serializer.errors
+                                    inserted_item.status = 'failed'
+                                    inserted_item.message = 'error occurred'
+                                    inserted_item.save()
+                    else:
+                        inserted_item.errors[store_slug] = catalog_serializer.errors
+                        inserted_item.status = 'failed'
+                        inserted_item.message = 'error occurred'
+                    inserted_item.save()
 
         return True

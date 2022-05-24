@@ -455,10 +455,10 @@ class CreateData():
         return True
 
 
-    def create_and_update_subjects(self, doc, item, course_provider, course_provider_model):
+    def create_subjects(self, doc, item, course_provider, course_provider_model):
         # insert every item in mongo to get status individually
         mongo_data = {
-            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_create_or_update', 'time': timezone.now(),
+            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_create', 'time': timezone.now(),
             'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
         }
 
@@ -471,9 +471,11 @@ class CreateData():
         data = item['data']
         data['slug'] = slugify(data['title'])
         data['from_importer'] = True
+        # description is required at C4I, if not provided by partner, we will put tiltle value here
+        data['description'] = data.get('description', data['title'])
 
         courses = []
-        #getting course from given course external_id
+        #getting courses from given course external_id
         for tagging_course in item['related_records']:
             if tagging_course.get('type', '') == 'course':
                 try:
@@ -517,7 +519,7 @@ class CreateData():
                 except Catalog.DoesNotExist:
                     catalog_serializer = CatalogSerializer(data=data)
                 else:
-                    catalog_serializer = CatalogSerializer(catalog, data=data)
+                    catalog_serializer = CatalogSerializer(catalog, data=data, partial=True)
 
                 if catalog_serializer.is_valid():
                     catalog = catalog_serializer.save()
@@ -527,7 +529,7 @@ class CreateData():
                     for course in courses:
                         try:
                             store_course = StoreCourse.objects.get(course=course, store=store)
-                        except Catalog.StoreCourse:
+                        except StoreCourse.DoesNotExist:
                             inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
                             inserted_item.save()
                         else:

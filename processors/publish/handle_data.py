@@ -108,7 +108,7 @@ def publish(doc_id):
                     create_data.create_products(doc, item, course_provider_model)
 
                 elif item['type'] == 'subject':
-                    create_data.create_and_update_subjects(doc, item, course_provider, course_provider_model)
+                    create_data.create_subjects(doc, item, course_provider, course_provider_model)
 
             for item in records:
                 if item['type'] == 'course':
@@ -139,6 +139,9 @@ def publish(doc_id):
                 elif item['type'] == 'product':
                     update_data.update_products(doc, item, course_provider_model)
 
+                elif item['type'] == 'subject':
+                    update_data.update_subjects(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
                     is_published = False
@@ -151,19 +154,19 @@ def publish(doc_id):
 
 
         elif action == "record_delete":
-            deactive_data = DeactivateData()
+            deactivate_data = DeactivateData()
             for item in records:
                 if item['type'] == 'course':
-                    deactive_data.deactivate_course(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_course(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'section':
-                    deactive_data.deactivate_section(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_section(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'schedule':
-                    deactive_data.deactivate_schedule(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_schedule(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'instructor':
-                    deactive_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
 
 
         print('message processing complete')
