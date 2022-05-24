@@ -513,7 +513,7 @@ class CreateData():
 
             with scopes_disabled():
                 try:
-                    catalog = Catalog.objects.get(external_id= str(data['external_id']), store=data['store'], slug=data['slug'])
+                    catalog = Catalog.objects.get(store=data['store'], slug=data['slug'])
                 except Catalog.DoesNotExist:
                     catalog_serializer = CatalogSerializer(data=data)
                 else:
