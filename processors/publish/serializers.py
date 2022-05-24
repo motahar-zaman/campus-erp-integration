@@ -73,8 +73,7 @@ class InstructorModelSerializer(DocumentSerializer):
 
     class Meta:
         model = InstructorModel
-        fields = ('id', 'provider', 'name', 'external_id',
-                  'profile_urls', 'image', 'short_bio', 'detail_bio')
+        fields = ('id', 'provider', 'name', 'external_id', 'profile_urls', 'image', 'short_bio', 'detail_bio')
 
 
 class SectionScheduleModelSerializer(EmbeddedDocumentSerializer):
@@ -100,9 +99,11 @@ class CatalogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Catalog
+        fields = '__all__'
 
 
 class CourseCatalogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CourseCatalog
+        fields = '__all__'
