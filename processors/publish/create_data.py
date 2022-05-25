@@ -558,7 +558,7 @@ class CreateData():
     def create_questions(self, doc, item, course_provider, course_provider_model):
         # insert every item in mongo to get status individually
         mongo_data = {
-            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_create', 'time': timezone.now(),
+            'data': item, 'publish_job_id': doc['id'], 'type': 'question_create', 'time': timezone.now(),
             'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
         }
 

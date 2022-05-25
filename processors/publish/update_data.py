@@ -17,14 +17,14 @@ from .helpers import (
     es_course_unpublish
 )
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer,\
+from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, QuestionBankSerializer,\
     CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer,\
     PublishLogModelSerializer, ProductSerializer, CourseCatalogSerializer, CatalogSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store, RelatedProduct, CourseCatalog, Catalog
+    StoreCourseSection, Store, RelatedProduct, CourseCatalog, Catalog, QuestionBank
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -622,5 +622,45 @@ class UpdateData():
                         inserted_item.status = 'failed'
                         inserted_item.message = 'error occurred'
                     inserted_item.save()
+
+        return True
+
+
+    def update_questions(self, doc, item, course_provider, course_provider_model):
+        # insert every item in mongo to get status individually
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'question_update', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['match'].get('external_id', '')
+        }
+
+        log_serializer = PublishLogModelSerializer(data=mongo_data)
+        if log_serializer.is_valid():
+            inserted_item = log_serializer.save()
+        else:
+            print(log_serializer.errors)
+
+        data = item['data']
+
+        try:
+            question = QuestionBank.objects.get(external_id=item['match'].get('external_id', ''), provider_ref=course_provider.id)
+        except QuestionBank.DoesNotExist:
+            inserted_item.errors = {'question': ['question does not found']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+
+        else:
+            question_bank_serializer = QuestionBankSerializer(question, data=data, partial=True)
+
+        if question_bank_serializer.is_valid():
+            question_bank_serializer.save()
+            inserted_item.message = 'task processed successfully'
+            inserted_item.status = 'completed'
+        else:
+            inserted_item.errors = product_serializer.errors
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+        inserted_item.save()
 
         return True

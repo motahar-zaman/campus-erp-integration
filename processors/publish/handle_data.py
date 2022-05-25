@@ -145,6 +145,9 @@ def publish(doc_id):
                 elif item['type'] == 'subject':
                     update_data.update_subjects(doc, item, course_provider, course_provider_model)
 
+                elif item['type'] == 'question':
+                    update_data.update_questions(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
                     is_published = False
