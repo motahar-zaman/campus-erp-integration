@@ -3,6 +3,8 @@ from mongoengine import get_db
 from decimal import Decimal
 
 from datetime import datetime
+from decouple import config
+import requests
 
 
 def write_status(doc, status, collection='publish_job'):
@@ -180,7 +182,7 @@ def prepare_section_postgres(data, fee, course, course_model):
         'execution_mode': data.get('execution_mode', 'self-paced'),
         'registration_deadline': get_datetime_obj(data.get('registration_deadline')),
         'content_db_reference': str(course_model.id),
-        'is_active': data.get('is_active', False),
+        'is_active': data.get('is_active', True),
         'start_date': get_datetime_obj(data.get('start_date')),
         'end_date': get_datetime_obj(data.get('end_date')),
         'execution_site': data.get('execution_site'),
@@ -329,3 +331,39 @@ def get_data(doc_id, collection):
     coll = db[collection]
     doc = coll.find_one({'_id': ObjectId(doc_id)})
     return doc
+
+
+def es_course_unpublish(store_course):
+    '''
+    checks the stores key in the course object and removes the store id of the store from which the course is being unpublished.
+    if the store id is the sole item, then the whole key is removed
+    '''
+    baseURL = config('ES_BASE_URL')
+    method = 'GET'
+    db_ref = store_course.course.content_db_reference
+    url = f'{baseURL}/course/_doc/{db_ref}?routing={db_ref}'
+    resp = requests.get(url)
+    course = resp.json()
+
+    if course['found']:
+        try:
+            stores = course['_source']['stores']
+        except KeyError:
+            pass
+        else:
+            if store_course.store.url_slug in stores:
+                stores.remove(store_course.store.url_slug)
+
+                if len(stores) == 0:
+                    method = 'DELETE'
+                    resp = requests.request(method, url)
+                else:
+                    url = url.replace('_doc', '_update')
+                    payload = {
+                        'doc': {
+                            "stores": stores
+                        }
+                    }
+
+                    method = 'POST'
+                    resp = requests.request(method, url, json=payload)

@@ -4,6 +4,7 @@ from authorizenet.apicontrollers import *
 from decouple import config
 
 def payment_transaction(payment, store_payment_gateway, transaction_type):
+    print('attempting priorauthtrasaction')
     authorizenet_base_api = config('AUTHORIZE_NET_BASE_API', 'https://apitest.authorize.net/xml/v1/request.api')
     merchant_auth = apicontractsv1.merchantAuthenticationType()
     merchant_auth.name = store_payment_gateway.payment_gateway_config.configuration['login_id']
@@ -26,8 +27,21 @@ def payment_transaction(payment, store_payment_gateway, transaction_type):
     response = createtransactioncontroller.getresponse()
 
     if (response.messages.resultCode=="Ok"):
-        status_data={'type': 'payment', 'payment_status': 'success', 'transaction_id': response.transactionResponse.transId, 'description': response.transactionResponse.messages.message[0].description, 'transaction_type': transaction_type}
-        # save_to_mongo(data=status_data, collection='enrollment_status_history')
+        status_data = {
+            'type': 'payment',
+            'payment_status': 'success',
+            'transaction_id': str(response.transactionResponse.transId),
+            'description': response.transactionResponse.messages.message[0].description,
+            'transaction_type': transaction_type
+        }
+        print('>>>> success')
+        save_to_mongo(data=status_data, collection='enrollment_status_history')
     else:
-        status_data={'type': 'payment', 'payment_status': 'failed', 'payment_id': str(payment.id), 'transaction_type': transaction_type}
+        status_data = {
+            'type': 'payment',
+            'payment_status': 'failed',
+            'payment_id': str(payment.id),
+            'transaction_type': transaction_type
+        }
+        print('>>>> fail')
         save_to_mongo(data=status_data, collection='enrollment_status_history')

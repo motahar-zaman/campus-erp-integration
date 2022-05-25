@@ -8,7 +8,7 @@ initialize_django()
 
 from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway, CourseProvider
 from .mindedge import handle_mindedge_enrollment
-from .j1 import handle_j1_enrollment
+from .j1 import handle_enrollment
 
 def enroll(enrollment_data):
     payment = enrollment_data['payment']
@@ -25,13 +25,21 @@ def enroll(enrollment_data):
                                 collection='enrollment_status_history')
                     continue
 
-        elif item['erp'] == 'j1':
-            cart = payment.cart
-            cart.enrollment_request = {'request': item['data']}
-            cart.save()
-            resp = handle_j1_enrollment(item['data'], item['enrollment_url'])
-            cart.enrollment_request['response'] = resp
-            cart.save()
+        elif item['erp'] == 'j1' or item['erp'] == 'hir':
+            # this whole thing is done this way becuase it must support
+            # multiple enrollments at once. but so far, gets only one
+            # enrollment per request
+
+            # so when enrolling in one, say j1, it works fine. but since this
+            # block is for both j1 and hir, in subsequent iteration, everything
+            # is overwritten by empty hir data.
+            if item['data']['enrollments']:
+                cart = payment.cart
+                cart.enrollment_request = {'request': item['data']}
+                cart.save()
+                resp = handle_enrollment(item['data'], item['config'])
+                cart.enrollment_request['response'] = resp
+                cart.save()
         else:
             for message_data in item['data']:
                 enrollment = message_data.pop('course_enrollment', None)
@@ -41,13 +49,14 @@ def enroll(enrollment_data):
                 else:
                     continue
 
+    # this will be done in partner api, after enrollment is successful, not before.
     # if payment.amount > 0.0:
     #     try:
     #         store_payment_gateway = StorePaymentGateway.objects.get(id=enrollment_data['store_payment_gateway_id'])
     #         payment_transaction(payment, store_payment_gateway, 'priorAuthCaptureTransaction')
     #     except StorePaymentGateway.DoesNotExist:
+    #         print('store payment gateway not found')
     #         pass
-
 
 def unenroll(data):
     with scopes_disabled():
