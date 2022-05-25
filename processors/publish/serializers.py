@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_mongoengine.serializers import DocumentSerializer, EmbeddedDocumentSerializer
 
-from shared_models.models import Course, Section, Product, Catalog, CourseCatalog
+from shared_models.models import Course, Section, Product, Catalog, CourseCatalog, QuestionBank
 from models.course.section import Section as SectionModel
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.course.course import Course as CourseModel
@@ -107,3 +107,9 @@ class CourseCatalogSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseCatalog
         fields = '__all__'
+
+
+class QuestionBankSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionBank
+        fields = ('id', 'provider_ref', 'provider_type', 'external_id', 'title', 'question_type', 'configuration')

@@ -110,6 +110,9 @@ def publish(doc_id):
                 elif item['type'] == 'subject':
                     create_data.create_subjects(doc, item, course_provider, course_provider_model)
 
+                elif item['type'] == 'question':
+                    create_data.create_questions(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
                     is_published = False
