@@ -168,6 +168,7 @@ class UpdateData():
 
         section_model_data = None
         section_model_code = None
+        fee = 0.0
 
         for section in course_model.sections:
             if section.external_id == str(data['match']['section']):
@@ -175,7 +176,15 @@ class UpdateData():
                 section_model_code = section_model_data['code']
                 break
 
-        data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
+
+        # if key "fee" is not present in payload, then manually set fee from the mongo object
+        if section_model_data:
+            try:
+                fee = section_model_data['course_fee']['amount']
+            except KeyError:
+                pass
+
+        data['data']['course_fee'] = {'amount': data['data'].get('fee', fee), 'currency': 'USD'}
 
         with scopes_disabled():
             try:
@@ -221,7 +230,7 @@ class UpdateData():
             return False
 
 
-        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
+        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', fee),  course, course_model)
         with scopes_disabled():
             try:
                 section = course.sections.get(name=section_model_code)

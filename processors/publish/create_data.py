@@ -137,9 +137,10 @@ class CreateData():
 
     def create_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
+        external_id = str(data['data'].get('external_id', data['parent'].get('course', '')))
         mongo_data = {
             'data': data, 'publish_job_id': doc['id'], 'type': 'section_create', 'time': timezone.now(),
-            'message': 'task is still in queue', 'status': 'pending', 'external_id': data['data'].get('external_id', '')
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id
         }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
@@ -160,6 +161,7 @@ class CreateData():
 
         section_model_data = None
         section_model_code = None
+        fee = 0.0
 
         for section in course_model.sections:
             if section.external_id == str(data['data'].get("external_id", '')):
@@ -167,7 +169,13 @@ class CreateData():
                 section_model_code = section_model_data['code']
                 break
 
-        data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
+        if section_model_data:
+            try:
+                fee = section_model_data['course_fee']['amount']
+            except KeyError:
+                pass
+
+        data['data']['course_fee'] = {'amount': data['data'].get('fee', fee), 'currency': 'USD'}
 
         with scopes_disabled():
             try:
@@ -210,7 +218,7 @@ class CreateData():
             CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
 
         # course_model.reload()
-        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
+        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', fee),  course, course_model)
         with scopes_disabled():
             try:
                 section = course.sections.get(name=section_model_code)
