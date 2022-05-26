@@ -189,8 +189,8 @@ class UpdateData():
                 inserted_item.message = 'error occurred'
                 inserted_item.save()
                 return False
-        # now update the sections in mongo
 
+        # now update the sections in mongo
         section_model_serializer = CheckSectionModelValidationSerializer(section_model_data, data=data['data'], partial=True)
 
         if section_model_serializer.is_valid():
@@ -224,7 +224,6 @@ class UpdateData():
 
 
         section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
-
         with scopes_disabled():
             try:
                 section = course.sections.get(name=section_model_code)
@@ -296,6 +295,11 @@ class UpdateData():
                         product.minimum_fee = section.fee
                         product.save()
 
+                    # delete previous related products for this product if available
+                    linked_related_products = RelatedProduct.objects.filter(product=product)
+                    linked_related_products.delete()
+
+                    # create related products for this product with given related_products
                     for related_product in related_products:
                         try:
                             child_product = Product.objects.get(

@@ -73,7 +73,7 @@ class CreateData():
 
                 try:
                     course_model = CourseModel.objects.get(
-                        external_id=str(item['match']['course']),
+                        external_id=str(data.get('external_id', '')),
                         provider=course_provider_model
                     )
                 except CourseModel.DoesNotExist:
@@ -158,6 +158,15 @@ class CreateData():
             inserted_item.save()
             return False
 
+        section_model_data = None
+        section_model_code = None
+
+        for section in course_model.sections:
+            if section.external_id == str(data['data']['"external_id":']):
+                section_model_data = section
+                section_model_code = section_model_data['code']
+                break
+
         data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
         with scopes_disabled():
@@ -170,11 +179,16 @@ class CreateData():
                 inserted_item.message = 'error occurred'
                 inserted_item.save()
                 return False
-        # now update the sections in mongo
 
-        section_model_serializer = CheckSectionModelValidationSerializer(data=data['data'])
+        # now update the sections in mongo
+        if section_model_data:
+            section_model_serializer = CheckSectionModelValidationSerializer(
+                section_model_data, data=data['data'], partial=True
+            )
+        else:
+            section_model_serializer = CheckSectionModelValidationSerializer(data=data['data'])
         if section_model_serializer.is_valid():
-            pass
+            section_model_serializer.save()
         else:
             inserted_item.errors = section_model_serializer.errors
             inserted_item.status = 'failed'
@@ -188,24 +202,26 @@ class CreateData():
                     new_section_data = sec_data.to_mongo().to_dict()
                     new_section_data.update(section_model_serializer.data)
                     course_model.sections[section_idx] = SectionModel(**new_section_data)
-                    course_model.save()
+                    # course_model.save()
                     break
             else:
                 CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
         else:
             CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-        course_model.reload()
+
+        # course_model.reload()
         section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', '0.00'),  course, course_model)
         with scopes_disabled():
             try:
-                section = course.sections.get(name=section_data['name'])
+                section = course.sections.get(name=section_model_code)
             except Section.DoesNotExist:
                 serializer = SectionSerializer(data=section_data)
             else:
-                serializer = SectionSerializer(section, data=section_data)
+                serializer = SectionSerializer(section, data=section_data, partial=True)
 
             if serializer.is_valid():
                 section = serializer.save()
+                course_model.save()
                 inserted_item.message = 'task processed successfully'
                 inserted_item.status = 'completed'
                 inserted_item.save()
@@ -262,6 +278,11 @@ class CreateData():
                         product.minimum_fee = section.fee
                         product.save()
 
+                    # delete previous related products for this product if available
+                    linked_related_products = RelatedProduct.objects.filter(product=product)
+                    linked_related_products.delete()
+
+                    # create related products for this product with given related_products
                     for related_product in related_products:
                         try:
                             child_product = Product.objects.get(
