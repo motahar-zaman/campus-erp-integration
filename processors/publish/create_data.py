@@ -162,7 +162,7 @@ class CreateData():
         section_model_code = None
 
         for section in course_model.sections:
-            if section.external_id == str(data['data']['"external_id":']):
+            if section.external_id == str(data['data'].get("external_id", '')):
                 section_model_data = section
                 section_model_code = section_model_data['code']
                 break
