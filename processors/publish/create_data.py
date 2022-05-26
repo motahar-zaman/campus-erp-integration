@@ -402,7 +402,16 @@ class CreateData():
             return False
 
         data['data']['provider'] = course_provider_model.id
-        instructor_model_serializer = InstructorModelSerializer(data=data['data'])
+
+        # upsert data
+        try:
+            instructor_model = InstructorModel.objects.get(
+                external_id=str(data['data']['external_id']), provider=course_provider_model
+            )
+        except InstructorModel.DoesNotExist:
+            instructor_model_serializer = InstructorModelSerializer(data=data['data'])
+        else:
+            instructor_model_serializer = InstructorModelSerializer(instructor_model, data=data['data'], partial=True)
 
         if instructor_model_serializer.is_valid():
             instructor_model = instructor_model_serializer.save()
@@ -419,13 +428,17 @@ class CreateData():
 
         for section in course_model.sections:
             if section['external_id'] == data['parent']['section']:
-                serializer = CheckSectionModelValidationSerializer(section)
-                serializer.data['instructors'].append(instructor_model.id)
-                CourseModel.objects(
-                    id=course_model.id,
-                    external_id=data['parent']['course'],
-                    sections__external_id=data['parent']['section'],
-                ).update_one(set__sections__S=SectionModel(**serializer.data))
+                for instructor in section['instructors']:
+                    if instructor == instructor_model:
+                        break
+                else:
+                    serializer = CheckSectionModelValidationSerializer(section)
+                    serializer.data['instructors'].append(instructor_model.id)
+                    CourseModel.objects(
+                        id=course_model.id,
+                        external_id=data['parent']['course'],
+                        sections__external_id=data['parent']['section'],
+                    ).update_one(set__sections__S=SectionModel(**serializer.data))
 
         return True
 
