@@ -339,7 +339,7 @@ class UpdateData():
             )
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['corresponding course does not found']}
+            inserted_item.errors = {'course': ['invalid parent course in schedule']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -347,7 +347,7 @@ class UpdateData():
 
         except CourseModel.MultipleObjectsReturned:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'external_id': ['many sections with the same external_id']}
+            inserted_item.errors = {'external_id': ['many courses with the same external_id']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -389,7 +389,6 @@ class UpdateData():
                 inserted_item.status = 'completed'
                 inserted_item.save()
                 break
-
         return True
 
 

@@ -319,7 +319,7 @@ class CreateData():
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in schedule']}
+            inserted_item.errors = {'course': ['invalid parent course in schedule']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -327,33 +327,34 @@ class CreateData():
 
         except CourseModel.MultipleObjectsReturned:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'external_id': ['many sections with the same external_id']}
+            inserted_item.errors = {'external_id': ['many courses with the same external_id']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
             return False
 
-        try:
-            data['data']['start_at'] = get_datetime_obj(data['data']['start_at'], inserted_item=inserted_item)
-            if not data['data']['start_at']:
-                inserted_item.errors = {'start_at': ['invalid date']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-        except KeyError:
-            data['data']['start_at'] = None
-
-        try:
-            data['data']['end_at'] = get_datetime_obj(data['data']['end_at'], inserted_item=inserted_item)
-            if not data['data']['end_at']:
-                inserted_item.errors = {'end_at': ['invalid date']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-        except KeyError:
-            data['data']['end_at'] = None
+        # try:
+        #     data['data']['start_at'] = get_datetime_obj(data['data']['start_at'], inserted_item=inserted_item)
+        #     if not data['data']['start_at']:
+        #         inserted_item.errors = {'start_at': ['invalid date']}
+        #         inserted_item.status = 'failed'
+        #         inserted_item.message = 'error occurred'
+        #         inserted_item.save()
+        #         return False
+        # except KeyError:
+        #     data['data']['start_at'] = None
+        #
+        # try:
+        #     data['data']['end_at'] = get_datetime_obj(data['data']['end_at'], inserted_item=inserted_item)
+        #     if not data['data']['end_at']:
+        #         inserted_item.errors = {'end_at': ['invalid date']}
+        #         inserted_item.status = 'failed'
+        #         inserted_item.message =
+        #         'error occurred'
+        #         inserted_item.save()
+        #         return False
+        # except KeyError:
+        #     data['data']['end_at'] = None
 
         # check if the provided data is valid. if not, abort.
         schedule_serializer = SectionScheduleModelSerializer(data=data['data'])
@@ -368,7 +369,15 @@ class CreateData():
             # schedule_exist = False
             if section['external_id'] == data['parent']['section']:
                 serializer = CheckSectionModelValidationSerializer(section)
-                serializer.data['schedules'].append(schedule_serializer.data)
+                if serializer.data['schedules']:
+                    for schedule_idx, schedule in enumerate(serializer.data['schedules']):
+                        if schedule['external_id'] == str(data['data']['external_id']):
+                            serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
+                            break
+                    else:
+                        serializer.data['schedules'].append(schedule_serializer.data)
+                else:
+                    serializer.data['schedules'].append(schedule_serializer.data)
 
                 course_model.sections[section_idx] = SectionModel(**serializer.data)
                 course_model.save()
@@ -376,6 +385,7 @@ class CreateData():
                 inserted_item.status = 'completed'
                 inserted_item.save()
                 break
+        return True
 
 
     def create_instructors(self, doc, data, course_provider_model):
