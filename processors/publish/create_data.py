@@ -17,14 +17,14 @@ from .helpers import (
     es_course_unpublish
 )
 
-from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer,\
+from .serializers import CourseSerializer, SectionSerializer, CourseModelSerializer, QuestionBankSerializer,\
     CheckSectionModelValidationSerializer, InstructorModelSerializer, SectionScheduleModelSerializer,\
     PublishLogModelSerializer, ProductSerializer, CatalogSerializer, CourseCatalogSerializer
 
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store, RelatedProduct, Catalog, CourseCatalog
+    StoreCourseSection, Store, RelatedProduct, Catalog, CourseCatalog, QuestionBank
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -70,7 +70,16 @@ class CreateData():
 
                 data['level'] = level
                 data['provider'] = course_provider_model.id
-                course_model_serializer = CourseModelSerializer(data=data)
+
+                try:
+                    course_model = CourseModel.objects.get(
+                        external_id=str(item['match']['course']),
+                        provider=course_provider_model
+                    )
+                except CourseModel.DoesNotExist:
+                    course_model_serializer = CourseModelSerializer(data=data)
+                else:
+                    course_model_serializer = CourseModelSerializer(course_model, data=data, partial=True)
 
                 if course_model_serializer.is_valid():
                     try:
@@ -92,7 +101,15 @@ class CreateData():
                 course_data = prepare_course_postgres(course_model, course_provider)
 
                 with scopes_disabled():
-                    course_serializer = CourseSerializer(data=course_data)
+                    try:
+                        course = Course.objects.get(
+                            content_db_reference=course_model.id,
+                            course_provider=course_provider
+                        )
+                    except Course.DoesNotExist:
+                        course_serializer = CourseSerializer(data=course_data)
+                    else:
+                        course_serializer = CourseSerializer(course, data=course_data, partial=True)
 
                     if course_serializer.is_valid():
                         course = course_serializer.save()
@@ -455,10 +472,10 @@ class CreateData():
         return True
 
 
-    def create_and_update_subjects(self, doc, item, course_provider, course_provider_model):
+    def create_subjects(self, doc, item, course_provider, course_provider_model):
         # insert every item in mongo to get status individually
         mongo_data = {
-            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_create_or_update', 'time': timezone.now(),
+            'data': item, 'publish_job_id': doc['id'], 'type': 'subject_create', 'time': timezone.now(),
             'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
         }
 
@@ -471,9 +488,11 @@ class CreateData():
         data = item['data']
         data['slug'] = slugify(data['title'])
         data['from_importer'] = True
+        # description is required at C4I, if not provided by partner, we will put tiltle value here
+        data['description'] = data.get('description', data['title'])
 
         courses = []
-        #getting course from given course external_id
+        #getting courses from given course external_id
         for tagging_course in item['related_records']:
             if tagging_course.get('type', '') == 'course':
                 try:
@@ -517,7 +536,7 @@ class CreateData():
                 except Catalog.DoesNotExist:
                     catalog_serializer = CatalogSerializer(data=data)
                 else:
-                    catalog_serializer = CatalogSerializer(catalog, data=data)
+                    catalog_serializer = CatalogSerializer(catalog, data=data, partial=True)
 
                 if catalog_serializer.is_valid():
                     catalog = catalog_serializer.save()
@@ -527,7 +546,7 @@ class CreateData():
                     for course in courses:
                         try:
                             store_course = StoreCourse.objects.get(course=course, store=store)
-                        except Catalog.StoreCourse:
+                        except StoreCourse.DoesNotExist:
                             inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
                             inserted_item.save()
                         else:
@@ -549,5 +568,42 @@ class CreateData():
                     inserted_item.status = 'failed'
                     inserted_item.message = 'error occurred'
                 inserted_item.save()
+
+        return True
+
+
+    def create_questions(self, doc, item, course_provider, course_provider_model):
+        # insert every item in mongo to get status individually
+        mongo_data = {
+            'data': item, 'publish_job_id': doc['id'], 'type': 'question_create', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['data'].get('external_id', '')
+        }
+
+        log_serializer = PublishLogModelSerializer(data=mongo_data)
+        if log_serializer.is_valid():
+            inserted_item = log_serializer.save()
+        else:
+            print(log_serializer.errors)
+
+        data = item['data']
+        data['provider_type'] = 'course_provider'
+        data['provider_ref'] = course_provider.id
+
+        try:
+            question = QuestionBank.objects.get(external_id=data['external_id'], provider_ref=data['provider_ref'])
+        except QuestionBank.DoesNotExist:
+            question_bank_serializer = QuestionBankSerializer(data=data)
+        else:
+            question_bank_serializer = QuestionBankSerializer(question, data=data, partial=True)
+
+        if question_bank_serializer.is_valid():
+            question_bank_serializer.save()
+            inserted_item.message = 'task processed successfully'
+            inserted_item.status = 'completed'
+        else:
+            inserted_item.errors = product_serializer.errors
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+        inserted_item.save()
 
         return True

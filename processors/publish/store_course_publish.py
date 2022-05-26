@@ -32,7 +32,10 @@ class StoreCoursePublish():
             store = get_object_or_404(Store, url_slug=store_slug)
 
             try:
-                course_obj = CourseModel.objects.get(external_id=data['data']['external_id'], provider=course_provider_model)
+                course_obj = CourseModel.objects.get(
+                    external_id=data['data']['external_id'],
+                    provider=course_provider_model
+                )
             except CourseModel.DoesNotExist:
                 # without that we can not proceed comfortably
                 inserted_item.errors = {'parent': ['course model does not found']}
