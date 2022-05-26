@@ -175,9 +175,7 @@ class UpdateData():
                 section_model_code = section_model_data['code']
                 break
 
-        course_fee = data['data'].get('fee', None)
-        if course_fee:
-            data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
+        data['data']['course_fee'] = {'amount': data['data'].get('fee', ''), 'currency': 'USD'}
 
         with scopes_disabled():
             try:
