@@ -20,8 +20,9 @@ class StoreCoursePublish():
     def course_publish_in_stores(self, doc, data, course_provider, course_provider_model):
         for store_slug in data['publishing_stores']:
             # insert every item in mongo to get status individually
+            external_id = str(data['data'].get('external_id', data['match'].get('course', '')))
             mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_publishing_'+store_slug, 'time': timezone.now(),
-                          'message': 'task is still in queue', 'status': 'pending', 'external_id': str(data['data']['external_id'])}
+                          'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id}
 
             log_serializer = PublishLogModelSerializer(data=mongo_data)
             if log_serializer.is_valid():
@@ -33,7 +34,7 @@ class StoreCoursePublish():
 
             try:
                 course_obj = CourseModel.objects.get(
-                    external_id=data['data']['external_id'],
+                    external_id=external_id,
                     provider=course_provider_model
                 )
             except CourseModel.DoesNotExist:
