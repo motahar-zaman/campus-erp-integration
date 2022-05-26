@@ -70,7 +70,16 @@ class CreateData():
 
                 data['level'] = level
                 data['provider'] = course_provider_model.id
-                course_model_serializer = CourseModelSerializer(data=data)
+
+                try:
+                    course_model = CourseModel.objects.get(
+                        external_id=str(item['match']['course']),
+                        provider=course_provider_model
+                    )
+                except CourseModel.DoesNotExist:
+                    course_model_serializer = CourseModelSerializer(data=data)
+                else:
+                    course_model_serializer = CourseModelSerializer(course_model, data=data, partial=True)
 
                 if course_model_serializer.is_valid():
                     try:
@@ -92,7 +101,15 @@ class CreateData():
                 course_data = prepare_course_postgres(course_model, course_provider)
 
                 with scopes_disabled():
-                    course_serializer = CourseSerializer(data=course_data)
+                    try:
+                        course = Course.objects.get(
+                            content_db_reference=course_model.id,
+                            course_provider=course_provider
+                        )
+                    except Course.DoesNotExist:
+                        course_serializer = CourseSerializer(data=course_data)
+                    else:
+                        course_serializer = CourseSerializer(course, data=course_data, partial=True)
 
                     if course_serializer.is_valid():
                         course = course_serializer.save()

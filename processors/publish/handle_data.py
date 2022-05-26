@@ -115,12 +115,11 @@ def publish(doc_id):
 
             for item in records:
                 if item['type'] == 'course':
-                    is_published = False
                     try:
                         is_published = item['data']['is_published']
                     except KeyError:
                         pass
-                    if is_published:
+                    else:
                         publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
 
         elif action == "record_update":
@@ -150,13 +149,12 @@ def publish(doc_id):
 
             for item in records:
                 if item['type'] == 'course':
-                    is_published = False
                     try:
                         is_published = item['data']['is_published']
                     except KeyError:
                         pass
-                    if is_published:
-                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model, contracts=contracts)
+                    else:
+                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
 
 
         elif action == "record_delete":
