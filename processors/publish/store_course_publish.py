@@ -18,9 +18,9 @@ initialize_django()
 
 class StoreCoursePublish():
     def course_publish_in_stores(self, doc, data, course_provider, course_provider_model):
+        external_id = str(data['data'].get('external_id', data['match'].get('course', '')))
         for store_slug in data['publishing_stores']:
             # insert every item in mongo to get status individually
-            external_id = str(data['data'].get('external_id', data['match'].get('course', '')))
             mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_publishing_'+store_slug, 'time': timezone.now(),
                           'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id}
 
@@ -185,7 +185,6 @@ class StoreCoursePublish():
                 self.es_course_unpublish(store_course)
 
         return True
-
 
 
     def es_course_publish(self, store_course):
