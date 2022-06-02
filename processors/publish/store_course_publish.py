@@ -143,7 +143,7 @@ class StoreCoursePublish():
                                 store_course_section.save()
 
                 else:
-                    # StoreCouse has an entry with this course and store already. Therefore, it was already 'published'.
+                    # StoreCourse has an entry with this course and store already. Therefore, it was already 'published'.
                     # we will now just update that entry's attributes, then it will appear in store frontend
 
                     with transaction.atomic():
@@ -154,7 +154,7 @@ class StoreCoursePublish():
                         store_course.active_status = True
                         store_course.save()
 
-                        # we will update the StoreCouseSection as well
+                        # we will update the StoreCourseSection as well
                         for section in course.sections.all():
                             try:
                                 store_course_section = StoreCourseSection.objects.get(
@@ -186,7 +186,7 @@ class StoreCoursePublish():
             inserted_item.status = 'completed'
             inserted_item.save()
 
-            # update the record into elasticsearech too
+            # update the record into elasticsearch too
 
             if is_published:
                 self.es_course_publish(store_course)
