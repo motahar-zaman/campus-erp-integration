@@ -558,7 +558,8 @@ class UpdateData():
                         provider=course_provider_model
                     )
                 except CourseModel.DoesNotExist:
-                    pass
+                    inserted_item.errors[tagging_course] = ['course with external_id ' + tagging_course + ' not found']
+                    inserted_item.save()
                 else:
                     with scopes_disabled():
                         try:
@@ -567,7 +568,9 @@ class UpdateData():
                                 course_provider=course_provider
                             )
                         except Course.DoesNotExist:
-                            pass
+                            inserted_item.errors[tagging_course] = [
+                                'course with external_id ' + tagging_course + ' not found']
+                            inserted_item.save()
                         else:
                             courses.append(course)
 
@@ -595,8 +598,7 @@ class UpdateData():
 
                     if catalog_serializer.is_valid():
                         catalog = catalog_serializer.save()
-                        inserted_item.errors[store_slug] = ['subject updated successfully']
-                        inserted_item.message = 'task processed successfully'
+                        inserted_item.message = 'subject created successfully'
                         inserted_item.status = 'completed'
                         inserted_item.save()
 
@@ -608,8 +610,9 @@ class UpdateData():
                         for course in courses:
                             try:
                                 store_course = StoreCourse.objects.get(course=course, store=store)
-                            except Catalog.StoreCourse:
-                                inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
+                            except StoreCourse.DoesNotExist:
+                                inserted_item.errors['course'] = ['course with external_id ' + course_models[
+                                    idx].external_id + ' is not published in store ' + store_slug]
                                 inserted_item.save()
 
                             else:
@@ -618,14 +621,12 @@ class UpdateData():
                                 )
                                 if course_catalog_serializer.is_valid():
                                     course_catalog_serializer.save()
-                                    inserted_item.errors[store_slug + '_course_catalog'] = ['course_catalog created successfully']
-                                    inserted_item.message = 'task processed successfully'
-                                    inserted_item.status = 'completed'
+                                    inserted_item.message = inserted_item.message + '' + os.linesep +\
+                                                            ' catalog successfully tagged with course with external_id'\
+                                                            + course_models[idx].external_id
                                     inserted_item.save()
                                 else:
                                     inserted_item.errors[store_slug + '_course_catalog'] = course_catalog_serializer.errors
-                                    inserted_item.status = 'failed'
-                                    inserted_item.message = 'error occurred'
                                     inserted_item.save()
                     else:
                         inserted_item.errors[store_slug] = catalog_serializer.errors

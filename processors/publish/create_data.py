@@ -33,6 +33,7 @@ from models.course.section import Section as SectionModel
 from models.log.publish_log import PublishLog as PublishLogModel
 from datetime import datetime
 import decimal
+import os
 from django.utils import timezone
 
 from django_scopes import scopes_disabled
@@ -544,6 +545,7 @@ class CreateData():
         data['description'] = data.get('description', data['title'])
 
         courses = []
+        course_models = []
         #getting courses from given course external_id
         for tagging_course in item['related_records']:
             if tagging_course.get('type', '') == 'course':
@@ -553,7 +555,8 @@ class CreateData():
                         provider=course_provider_model
                     )
                 except CourseModel.DoesNotExist:
-                    pass
+                    inserted_item.errors[tagging_course] = ['course with external_id ' + tagging_course + ' not found']
+                    inserted_item.save()
                 else:
                     with scopes_disabled():
                         try:
@@ -562,9 +565,12 @@ class CreateData():
                                 course_provider=course_provider
                             )
                         except Course.DoesNotExist:
-                            pass
+                            inserted_item.errors[tagging_course] = [
+                                'course with external_id ' + tagging_course + ' not found']
+                            inserted_item.save()
                         else:
                             courses.append(course)
+                            course_models.append(course_model)
 
         # getting store from given store_slug list
         # create catalog for that store
@@ -582,6 +588,7 @@ class CreateData():
             else:
                 data['store'] = str(store.id)
 
+            # upsert catalog for that store
             with scopes_disabled():
                 try:
                     catalog = Catalog.objects.get(store=data['store'], slug=data['slug'])
@@ -592,29 +599,39 @@ class CreateData():
 
                 if catalog_serializer.is_valid():
                     catalog = catalog_serializer.save()
-                    inserted_item.errors[store_slug] = ['subject created successfully']
+                    inserted_item.message = 'subject created successfully'
+                    inserted_item.status = 'completed'
                     inserted_item.save()
 
-                    for course in courses:
+                    # tag catalog with store course
+                    for idx, course in enumerate(courses):
                         try:
                             store_course = StoreCourse.objects.get(course=course, store=store)
                         except StoreCourse.DoesNotExist:
-                            inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
+                            inserted_item.errors['course'] = ['course with external_id '+ course_models[
+                                idx].external_id +' is not published in store '+ store_slug]
                             inserted_item.save()
                         else:
                             try:
                                 course_catalog = CourseCatalog.objects.get(catalog=catalog, store_course=store_course)
                             except CourseCatalog.DoesNotExist:
-                                course_catalog_serializer = CourseCatalogSerializer(data={'catalog': catalog.id, 'store_course': store_course.id})
+                                course_catalog_serializer = CourseCatalogSerializer(data={
+                                    'catalog': catalog.id, 'store_course': store_course.id
+                                })
                                 if course_catalog_serializer.is_valid():
                                     course_catalog_serializer.save()
-                                    inserted_item.errors[store_slug + '_course_catalog'] = ['course_catalog created successfully']
+                                    inserted_item.message = inserted_item.message + '' + os.linesep +\
+                                                            ' catalog successfully tagged with course with external_id'\
+                                                            + course_models[idx].external_id
                                     inserted_item.save()
                                 else:
                                     inserted_item.errors[store_slug + '_course_catalog'] = course_catalog_serializer.errors
                                     inserted_item.save()
                             else:
-                                pass
+                                inserted_item.message = inserted_item.message + '' + os.linesep +\
+                                                        ' catalog already tagged with course with external_id' +\
+                                                        course_models[idx].external_id
+                                inserted_item.save()
                 else:
                     inserted_item.errors[store_slug] = catalog_serializer.errors
                     inserted_item.status = 'failed'
