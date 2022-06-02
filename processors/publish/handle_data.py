@@ -73,8 +73,7 @@ def publish(doc_id):
             return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
-        # if contracts.count() > 0:
-        #     write_log(doc, 'contracts found', 'publish_job')
+
         try:
             action = doc['payload']['action']
             records = doc['payload']['records']
