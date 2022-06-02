@@ -171,7 +171,10 @@ class StoreCoursePublish():
             # update the course object in mongodb too
             course_obj._is_published = is_published
             course_obj.save()
-            course.content_ready = True
+
+            if is_published:
+                course.content_ready = True
+
             course.save()
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'

@@ -150,6 +150,7 @@ class CreateData():
         else:
             print(log_serializer.errors)
 
+        # Access data from MongoDB
         try:
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
@@ -162,12 +163,14 @@ class CreateData():
 
         section_model_data = None
         section_model_code = None
+        section_model_external_id = None
         fee = 0.0
 
         for section in course_model.sections:
             if section.external_id == str(data['data'].get("external_id", '')):
                 section_model_data = section
-                section_model_code = section_model_data['code']
+                section_model_code = section['code']
+                section_model_external_id = section['external_id']
                 break
 
         if section_model_data:
@@ -178,18 +181,6 @@ class CreateData():
 
         data['data']['course_fee'] = {'amount': data['data'].get('fee', fee), 'currency': 'USD'}
 
-        with scopes_disabled():
-            try:
-                course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
-            except Course.DoesNotExist:
-                # without that we can not proceed comfortably
-                inserted_item.errors = {'parent': ['corresponding course does not found in database']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-
-        # now update the sections in mongo
         if section_model_data:
             section_model_serializer = CheckSectionModelValidationSerializer(
                 section_model_data, data=data['data'], partial=True
@@ -205,22 +196,21 @@ class CreateData():
             inserted_item.save()
             return False
 
-        if course_model.sections:
-            for section_idx, sec_data in enumerate(course_model.sections):
-                if sec_data['external_id'] == section_model_serializer.data['external_id']:
-                    new_section_data = sec_data.to_mongo().to_dict()
-                    new_section_data.update(section_model_serializer.data)
-                    course_model.sections[section_idx] = SectionModel(**new_section_data)
-                    # course_model.save()
-                    break
-            else:
-                CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-        else:
-            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-
-        # course_model.reload()
-        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', fee),  course, course_model)
+        # Access data and upsert in postgres
         with scopes_disabled():
+            try:
+                course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
+            except Course.DoesNotExist:
+                # without that we can not proceed comfortably
+                inserted_item.errors = {'parent': ['corresponding course not found']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+
+            section_data = prepare_section_postgres(
+                section_model_serializer.data, data['data'].get('fee', fee), course, course_model
+            )
             try:
                 section = course.sections.get(name=section_model_code)
             except Section.DoesNotExist:
@@ -230,7 +220,6 @@ class CreateData():
 
             if serializer.is_valid():
                 section = serializer.save()
-                course_model.save()
                 inserted_item.message = 'task processed successfully'
                 inserted_item.status = 'completed'
                 inserted_item.save()
@@ -241,8 +230,21 @@ class CreateData():
                 inserted_item.save()
                 return False
 
-        # now, we find store courses, utilizing contracts.
-        # if we find store courses, we update store course sections
+        # section upsert completed in postgres
+        # now upsert the section in mongo
+        if course_model.sections:
+            for section_idx, sec_data in enumerate(course_model.sections):
+                if sec_data['external_id'] == section_model_external_id:
+                    new_section_data = sec_data.to_mongo().to_dict()
+                    new_section_data.update(section_model_serializer.data)
+                    course_model.sections[section_idx] = SectionModel(**new_section_data)
+                    break
+            else:
+                CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+        else:
+            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+
+        course_model.save()
 
         related_products = data.get('related_records', [])
 
