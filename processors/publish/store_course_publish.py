@@ -30,7 +30,14 @@ class StoreCoursePublish():
             else:
                 print(log_serializer.errors)
 
-            store = get_object_or_404(Store, url_slug=store_slug)
+            try:
+                store = Store.objects.get(url_slug=store_slug)
+            except Store.DoesNotExist:
+                inserted_item.errors = {'store': ['store not found']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
 
             try:
                 course_obj = CourseModel.objects.get(
@@ -61,7 +68,6 @@ class StoreCoursePublish():
                     store_course = StoreCourse.objects.get(store=store, course=course)
                 except StoreCourse.DoesNotExist:
                     # create a new StoreCourse e.g. publish
-
                     # checking if course sharing contract exists
                     try:
                         contract = CourseSharingContract.objects.get(
@@ -138,7 +144,7 @@ class StoreCoursePublish():
 
                 else:
                     # StoreCouse has an entry with this course and store already. Therefore, it was already 'published'.
-                    # we will now just update that entry's attributes
+                    # we will now just update that entry's attributes, then it will appear in store frontend
 
                     with transaction.atomic():
                         store_course.is_published = is_published
