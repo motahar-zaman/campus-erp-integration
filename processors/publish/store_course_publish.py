@@ -30,7 +30,14 @@ class StoreCoursePublish():
             else:
                 print(log_serializer.errors)
 
-            store = get_object_or_404(Store, url_slug=store_slug)
+            try:
+                store = Store.objects.get(url_slug=store_slug)
+            except Store.DoesNotExist:
+                inserted_item.errors = {'store': ['store not found']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
 
             try:
                 course_obj = CourseModel.objects.get(
@@ -61,7 +68,6 @@ class StoreCoursePublish():
                     store_course = StoreCourse.objects.get(store=store, course=course)
                 except StoreCourse.DoesNotExist:
                     # create a new StoreCourse e.g. publish
-
                     # checking if course sharing contract exists
                     try:
                         contract = CourseSharingContract.objects.get(
@@ -137,8 +143,8 @@ class StoreCoursePublish():
                                 store_course_section.save()
 
                 else:
-                    # StoreCouse has an entry with this course and store already. Therefore, it was already 'published'.
-                    # we will now just update that entry's attributes
+                    # StoreCourse has an entry with this course and store already. Therefore, it was already 'published'.
+                    # we will now just update that entry's attributes, then it will appear in store frontend
 
                     with transaction.atomic():
                         store_course.is_published = is_published
@@ -148,7 +154,7 @@ class StoreCoursePublish():
                         store_course.active_status = True
                         store_course.save()
 
-                        # we will update the StoreCouseSection as well
+                        # we will update the StoreCourseSection as well
                         for section in course.sections.all():
                             try:
                                 store_course_section = StoreCourseSection.objects.get(
@@ -171,13 +177,16 @@ class StoreCoursePublish():
             # update the course object in mongodb too
             course_obj._is_published = is_published
             course_obj.save()
-            course.content_ready = True
+
+            if is_published:
+                course.content_ready = True
+
             course.save()
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'
             inserted_item.save()
 
-            # update the record into elasticsearech too
+            # update the record into elasticsearch too
 
             if is_published:
                 self.es_course_publish(store_course)
