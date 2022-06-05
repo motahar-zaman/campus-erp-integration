@@ -33,6 +33,7 @@ from models.course.section import Section as SectionModel
 from models.log.publish_log import PublishLog as PublishLogModel
 from datetime import datetime
 import decimal
+import os
 from django.utils import timezone
 
 from django_scopes import scopes_disabled
@@ -149,6 +150,7 @@ class CreateData():
         else:
             print(log_serializer.errors)
 
+        # Access data from MongoDB
         try:
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
@@ -161,12 +163,14 @@ class CreateData():
 
         section_model_data = None
         section_model_code = None
+        section_model_external_id = None
         fee = 0.0
 
         for section in course_model.sections:
             if section.external_id == str(data['data'].get("external_id", '')):
                 section_model_data = section
-                section_model_code = section_model_data['code']
+                section_model_code = section['code']
+                section_model_external_id = section['external_id']
                 break
 
         if section_model_data:
@@ -177,18 +181,6 @@ class CreateData():
 
         data['data']['course_fee'] = {'amount': data['data'].get('fee', fee), 'currency': 'USD'}
 
-        with scopes_disabled():
-            try:
-                course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
-            except Course.DoesNotExist:
-                # without that we can not proceed comfortably
-                inserted_item.errors = {'parent': ['corresponding course does not found in database']}
-                inserted_item.status = 'failed'
-                inserted_item.message = 'error occurred'
-                inserted_item.save()
-                return False
-
-        # now update the sections in mongo
         if section_model_data:
             section_model_serializer = CheckSectionModelValidationSerializer(
                 section_model_data, data=data['data'], partial=True
@@ -204,22 +196,21 @@ class CreateData():
             inserted_item.save()
             return False
 
-        if course_model.sections:
-            for section_idx, sec_data in enumerate(course_model.sections):
-                if sec_data['external_id'] == section_model_serializer.data['external_id']:
-                    new_section_data = sec_data.to_mongo().to_dict()
-                    new_section_data.update(section_model_serializer.data)
-                    course_model.sections[section_idx] = SectionModel(**new_section_data)
-                    # course_model.save()
-                    break
-            else:
-                CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-        else:
-            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
-
-        # course_model.reload()
-        section_data = prepare_section_postgres(section_model_serializer.data, data['data'].get('fee', fee),  course, course_model)
+        # Access data and upsert in postgres
         with scopes_disabled():
+            try:
+                course = Course.objects.get(content_db_reference=str(course_model.id), course_provider=course_provider)
+            except Course.DoesNotExist:
+                # without that we can not proceed comfortably
+                inserted_item.errors = {'parent': ['corresponding course not found']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+
+            section_data = prepare_section_postgres(
+                section_model_serializer.data, data['data'].get('fee', fee), course, course_model
+            )
             try:
                 section = course.sections.get(name=section_model_code)
             except Section.DoesNotExist:
@@ -229,7 +220,6 @@ class CreateData():
 
             if serializer.is_valid():
                 section = serializer.save()
-                course_model.save()
                 inserted_item.message = 'task processed successfully'
                 inserted_item.status = 'completed'
                 inserted_item.save()
@@ -240,8 +230,21 @@ class CreateData():
                 inserted_item.save()
                 return False
 
-        # now, we find store courses, utilizing contracts.
-        # if we find store courses, we update store course sections
+        # section upsert completed in postgres
+        # now upsert the section in mongo
+        if course_model.sections:
+            for section_idx, sec_data in enumerate(course_model.sections):
+                if sec_data['external_id'] == section_model_external_id:
+                    new_section_data = sec_data.to_mongo().to_dict()
+                    new_section_data.update(section_model_serializer.data)
+                    course_model.sections[section_idx] = SectionModel(**new_section_data)
+                    break
+            else:
+                CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+        else:
+            CourseModel.objects(id=course_model.id).update_one(add_to_set__sections=section_model_serializer.data)
+
+        course_model.save()
 
         related_products = data.get('related_records', [])
 
@@ -292,22 +295,59 @@ class CreateData():
 
                     # create related products for this product with given related_products
                     for related_product in related_products:
-                        try:
-                            child_product = Product.objects.get(
-                                external_id=related_product['external_id'],
-                                product_type=related_product['type']
-                            )
-                        except Exception:
-                            pass
-                        else:
+                        if related_product['type'] == 'product':
+                            # create new task to get status for all related records
+                            external_id = str(related_product.get('external_id', 'None'))
+                            mongo_data = {
+                                'data': data, 'publish_job_id': doc['id'], 'type': 'related_product_create',
+                                'time': timezone.now(),
+                                'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id
+                            }
+
+                            log_serializer = PublishLogModelSerializer(data=mongo_data)
+                            if log_serializer.is_valid():
+                                inserted_item = log_serializer.save()
+                            else:
+                                print(log_serializer.errors)
+
+                            # find the child products first
                             try:
-                                related_product = RelatedProduct.objects.create(
-                                    product=product,
-                                    related_product=child_product,
-                                    related_product_type=related_product['relation_type']
+                                child_product = Product.objects.get(
+                                    external_id=related_product['external_id'],
+                                    product_type=related_product['external_type']
                                 )
-                            except Exception:
-                                pass
+                            except Product.DoesNotExist:
+                                inserted_item.errors = {'product': ['no product available with the external_id and external_type']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+
+                            except Product.MultipleObjectsReturned:
+                                inserted_item.errors = {'product': ['multiple products with the same external_id and external_type']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+                            except Exception as exc:
+                                inserted_item.errors = {'error': ['unknown error occurred when searching related product']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+                            else:
+                                try:
+                                    related_product = RelatedProduct.objects.create(
+                                        product=product,
+                                        related_product=child_product,
+                                        related_product_type=related_product['relation_type']
+                                    )
+                                except Exception as exc:
+                                    inserted_item.errors = {'error': ['unknown error occurred when creating related product']}
+                                    inserted_item.status = 'failed'
+                                    inserted_item.message = 'error occurred'
+                                    inserted_item.save()
+                                else:
+                                    inserted_item.message = 'task processed successfully'
+                                    inserted_item.status = 'completed'
+                                    inserted_item.save()
 
 
     def create_schedules(self, doc, data, course_provider_model):
@@ -544,6 +584,7 @@ class CreateData():
         data['description'] = data.get('description', data['title'])
 
         courses = []
+        course_models = []
         #getting courses from given course external_id
         for tagging_course in item['related_records']:
             if tagging_course.get('type', '') == 'course':
@@ -553,7 +594,8 @@ class CreateData():
                         provider=course_provider_model
                     )
                 except CourseModel.DoesNotExist:
-                    pass
+                    inserted_item.errors[tagging_course] = ['course with external_id ' + tagging_course + ' not found']
+                    inserted_item.save()
                 else:
                     with scopes_disabled():
                         try:
@@ -562,9 +604,12 @@ class CreateData():
                                 course_provider=course_provider
                             )
                         except Course.DoesNotExist:
-                            pass
+                            inserted_item.errors[tagging_course] = [
+                                'course with external_id ' + tagging_course + ' not found']
+                            inserted_item.save()
                         else:
                             courses.append(course)
+                            course_models.append(course_model)
 
         # getting store from given store_slug list
         # create catalog for that store
@@ -582,6 +627,7 @@ class CreateData():
             else:
                 data['store'] = str(store.id)
 
+            # upsert catalog for that store
             with scopes_disabled():
                 try:
                     catalog = Catalog.objects.get(store=data['store'], slug=data['slug'])
@@ -592,29 +638,39 @@ class CreateData():
 
                 if catalog_serializer.is_valid():
                     catalog = catalog_serializer.save()
-                    inserted_item.errors[store_slug] = ['subject created successfully']
+                    inserted_item.message = 'subject created successfully'
+                    inserted_item.status = 'completed'
                     inserted_item.save()
 
-                    for course in courses:
+                    # tag catalog with store course
+                    for idx, course in enumerate(courses):
                         try:
                             store_course = StoreCourse.objects.get(course=course, store=store)
                         except StoreCourse.DoesNotExist:
-                            inserted_item.errors[store_slug + '__' + course] = ['store_course did not find']
+                            inserted_item.errors['course'] = ['course with external_id '+ course_models[
+                                idx].external_id +' is not published in store '+ store_slug]
                             inserted_item.save()
                         else:
                             try:
                                 course_catalog = CourseCatalog.objects.get(catalog=catalog, store_course=store_course)
                             except CourseCatalog.DoesNotExist:
-                                course_catalog_serializer = CourseCatalogSerializer(data={'catalog': catalog.id, 'store_course': store_course.id})
+                                course_catalog_serializer = CourseCatalogSerializer(data={
+                                    'catalog': catalog.id, 'store_course': store_course.id
+                                })
                                 if course_catalog_serializer.is_valid():
                                     course_catalog_serializer.save()
-                                    inserted_item.errors[store_slug + '_course_catalog'] = ['course_catalog created successfully']
+                                    inserted_item.message = inserted_item.message + '' + os.linesep +\
+                                                            ' catalog successfully tagged with course with external_id'\
+                                                            + course_models[idx].external_id
                                     inserted_item.save()
                                 else:
                                     inserted_item.errors[store_slug + '_course_catalog'] = course_catalog_serializer.errors
                                     inserted_item.save()
                             else:
-                                pass
+                                inserted_item.message = inserted_item.message + '' + os.linesep +\
+                                                        ' catalog already tagged with course with external_id' +\
+                                                        course_models[idx].external_id
+                                inserted_item.save()
                 else:
                     inserted_item.errors[store_slug] = catalog_serializer.errors
                     inserted_item.status = 'failed'
