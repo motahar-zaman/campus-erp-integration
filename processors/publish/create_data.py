@@ -295,22 +295,59 @@ class CreateData():
 
                     # create related products for this product with given related_products
                     for related_product in related_products:
-                        try:
-                            child_product = Product.objects.get(
-                                external_id=related_product['external_id'],
-                                product_type=related_product['type']
-                            )
-                        except Exception:
-                            pass
-                        else:
+                        if related_product['type'] == 'product':
+                            # create new task to get status for all related records
+                            external_id = str(related_product.get('external_id', 'None'))
+                            mongo_data = {
+                                'data': data, 'publish_job_id': doc['id'], 'type': 'related_product_create',
+                                'time': timezone.now(),
+                                'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id
+                            }
+
+                            log_serializer = PublishLogModelSerializer(data=mongo_data)
+                            if log_serializer.is_valid():
+                                inserted_item = log_serializer.save()
+                            else:
+                                print(log_serializer.errors)
+
+                            # find the child products first
                             try:
-                                related_product = RelatedProduct.objects.create(
-                                    product=product,
-                                    related_product=child_product,
-                                    related_product_type=related_product['relation_type']
+                                child_product = Product.objects.get(
+                                    external_id=related_product['external_id'],
+                                    product_type=related_product['external_type']
                                 )
-                            except Exception:
-                                pass
+                            except Product.DoesNotExist:
+                                inserted_item.errors = {'product': ['no product available with the external_id and external_type']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+
+                            except Product.MultipleObjectsReturned:
+                                inserted_item.errors = {'product': ['multiple products with the same external_id and external_type']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+                            except Exception as exc:
+                                inserted_item.errors = {'error': ['unknown error occurred when searching related product']}
+                                inserted_item.status = 'failed'
+                                inserted_item.message = 'error occurred'
+                                inserted_item.save()
+                            else:
+                                try:
+                                    related_product = RelatedProduct.objects.create(
+                                        product=product,
+                                        related_product=child_product,
+                                        related_product_type=related_product['relation_type']
+                                    )
+                                except Exception as exc:
+                                    inserted_item.errors = {'error': ['unknown error occurred when creating related product']}
+                                    inserted_item.status = 'failed'
+                                    inserted_item.message = 'error occurred'
+                                    inserted_item.save()
+                                else:
+                                    inserted_item.message = 'task processed successfully'
+                                    inserted_item.status = 'completed'
+                                    inserted_item.save()
 
 
     def create_schedules(self, doc, data, course_provider_model):
