@@ -660,7 +660,7 @@ class CreateData():
                                 if course_catalog_serializer.is_valid():
                                     course_catalog_serializer.save()
                                     inserted_item.message = inserted_item.message + '' + os.linesep +\
-                                                            ' catalog successfully tagged with course with external_id'\
+                                                            ' catalog successfully tagged with course with external_id '\
                                                             + course_models[idx].external_id
                                     inserted_item.save()
                                 else:
