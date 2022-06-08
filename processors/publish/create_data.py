@@ -709,7 +709,7 @@ class CreateData():
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'
         else:
-            inserted_item.errors = product_serializer.errors
+            inserted_item.errors = question_bank_serializer.errors
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
         inserted_item.save()
