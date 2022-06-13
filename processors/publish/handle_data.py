@@ -38,6 +38,7 @@ from django.utils import timezone
 from processors.publish.create_data import CreateData
 from processors.publish.update_data import UpdateData
 from processors.publish.deactivate_data import DeactivateData
+from processors.publish.tag_data import TagData
 from processors.publish.store_course_publish import StoreCoursePublish
 
 from django_scopes import scopes_disabled
@@ -155,7 +156,6 @@ def publish(doc_id):
                     else:
                         publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
 
-
         elif action == "record_delete":
             deactivate_data = DeactivateData()
             for item in records:
@@ -171,5 +171,10 @@ def publish(doc_id):
                 elif item['type'] == 'instructor':
                     deactivate_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
 
+        elif action == "record_tag":
+            tag_data = TagData()
+            for item in records:
+                if item['type'] == 'question':
+                    tag_data.tag_question(doc, item, course_provider, course_provider_model)
 
         print('message processing complete')
