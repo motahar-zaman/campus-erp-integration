@@ -641,7 +641,7 @@ class UpdateData():
         # insert every item in mongo to get status individually
         mongo_data = {
             'data': item, 'publish_job_id': doc['id'], 'type': 'question_update', 'time': timezone.now(),
-            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['match'].get('external_id', '')
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': item['match'].get('question', '')
         }
 
         log_serializer = PublishLogModelSerializer(data=mongo_data)
@@ -653,7 +653,7 @@ class UpdateData():
         data = item['data']
 
         try:
-            question = QuestionBank.objects.get(external_id=item['match'].get('external_id', ''), provider_ref=course_provider.id)
+            question = QuestionBank.objects.get(external_id=item['match'].get('question', ''), provider_ref=course_provider.id)
         except QuestionBank.DoesNotExist:
             inserted_item.errors = {'question': ['question does not found']}
             inserted_item.status = 'failed'
