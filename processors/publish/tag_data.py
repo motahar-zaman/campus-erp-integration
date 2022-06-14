@@ -26,7 +26,7 @@ class TagData():
         try:
             question = QuestionBank.objects.get(external_id=str(external_id), provider_ref=course_provider.id)
         except QuestionBank.DoesNotExist:
-            inserted_item.errors =  {'question': ['question with the external_is not found for this provider']}
+            inserted_item.errors =  {'question': ['question with the external_id not found for this provider']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()

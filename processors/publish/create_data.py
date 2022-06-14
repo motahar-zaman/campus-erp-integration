@@ -696,6 +696,8 @@ class CreateData():
         data = item['data']
         data['provider_type'] = 'course_provider'
         data['provider_ref'] = course_provider.id
+        data['question_type'] = data['input'].get('type', None)
+        data['configuration'] = data['input'].get('config', {})
 
         try:
             question = QuestionBank.objects.get(external_id=data['external_id'], provider_ref=data['provider_ref'])
