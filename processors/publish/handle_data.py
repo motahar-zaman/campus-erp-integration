@@ -38,6 +38,7 @@ from django.utils import timezone
 from processors.publish.create_data import CreateData
 from processors.publish.update_data import UpdateData
 from processors.publish.deactivate_data import DeactivateData
+from processors.publish.tag_data import TagData
 from processors.publish.store_course_publish import StoreCoursePublish
 
 from django_scopes import scopes_disabled
@@ -73,8 +74,7 @@ def publish(doc_id):
             return False
 
         contracts = CourseSharingContract.objects.filter(course_provider__id=course_provider_id, is_active=True)
-        # if contracts.count() > 0:
-        #     write_log(doc, 'contracts found', 'publish_job')
+
         try:
             action = doc['payload']['action']
             records = doc['payload']['records']
@@ -107,14 +107,19 @@ def publish(doc_id):
                 elif item['type'] == 'product':
                     create_data.create_products(doc, item, course_provider_model)
 
+                elif item['type'] == 'subject':
+                    create_data.create_subjects(doc, item, course_provider, course_provider_model)
+
+                elif item['type'] == 'question':
+                    create_data.create_questions(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
-                    is_published = False
                     try:
                         is_published = item['data']['is_published']
                     except KeyError:
                         pass
-                    if is_published:
+                    else:
                         publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
 
         elif action == "record_update":
@@ -136,31 +141,40 @@ def publish(doc_id):
                 elif item['type'] == 'product':
                     update_data.update_products(doc, item, course_provider_model)
 
+                elif item['type'] == 'subject':
+                    update_data.update_subjects(doc, item, course_provider, course_provider_model)
+
+                elif item['type'] == 'question':
+                    update_data.update_questions(doc, item, course_provider, course_provider_model)
+
             for item in records:
                 if item['type'] == 'course':
-                    is_published = False
                     try:
                         is_published = item['data']['is_published']
                     except KeyError:
                         pass
-                    if is_published:
-                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model, contracts=contracts)
-
+                    else:
+                        publish_course.course_publish_in_stores(doc, item, course_provider, course_provider_model)
 
         elif action == "record_delete":
-            deactive_data = DeactivateData()
+            deactivate_data = DeactivateData()
             for item in records:
                 if item['type'] == 'course':
-                    deactive_data.deactivate_course(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_course(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'section':
-                    deactive_data.deactivate_section(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_section(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'schedule':
-                    deactive_data.deactivate_schedule(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_schedule(doc, course_provider, course_provider_model, item)
 
                 elif item['type'] == 'instructor':
-                    deactive_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
+                    deactivate_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
 
+        elif action == "record_tag":
+            tag_data = TagData()
+            for item in records:
+                if item['type'] == 'question':
+                    tag_data.tag_question(doc, item, course_provider, course_provider_model)
 
         print('message processing complete')
