@@ -8,7 +8,8 @@ from formatters.importers import ImportFormatter
 from processors.enrollment.common import enroll, unenroll
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
-from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo, import_sections_postgres
+from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo,\
+    import_sections_postgres, import_profiles_postgres
 from processors.publish.handle_data import publish
 from processors.notification.notification import notification_to_course_provider
 
@@ -114,6 +115,13 @@ def import_callback(ch, method, properties, body):
         formatter = ImportFormatter()
         import_task = formatter.section(payload)
         import_sections_postgres(import_task)
+        print('Done')
+
+    if 'profile_postgres' in method.routing_key:
+        print('* Importing profile to postgres')
+        formatter = ImportFormatter()
+        import_task = formatter.profile(payload)
+        import_profiles_postgres(import_task)
         print('Done')
 
 

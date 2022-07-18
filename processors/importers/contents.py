@@ -1,4 +1,3 @@
-
 from bson import ObjectId
 from campuslibs.loggers.mongo import save_to_mongo
 from config import mongo_client
@@ -12,10 +11,7 @@ import json
 import pandas as pd
 import pika
 
-
-initialize_django()
-
-from shared_models.models import Course, Section
+from shared_models.models import Course, Section, Profile, ProfileStore
 from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
@@ -23,6 +19,8 @@ from models.course.section_schedule import SectionSchedule
 from models.occupation.occupation import Occupation as OccupationModel
 from models.courseprovider.provider_site import CourseProviderSite
 from models.courseprovider.instructor import Instructor
+
+initialize_django()
 
 
 def create_queue_postgres(import_task):
@@ -173,6 +171,7 @@ def import_courses_postgres(import_task):
     finally:
         mongo_client.disconnect_mongodb()
 
+
 def get_section_schedules(import_task, row, schedules):
     try:
         schedules = schedules[row['code']]
@@ -180,6 +179,7 @@ def get_section_schedules(import_task, row, schedules):
         return []
 
     return [SectionSchedule(**item) for item in schedules]
+
 
 def get_section_instructors(import_task, row, instructors):
     try:
@@ -196,6 +196,7 @@ def get_section_instructors(import_task, row, instructors):
             obj = Instructor.objects.create(**item)
         ins.append(obj)
     return ins
+
 
 def import_sections_mongo(import_task):
     print('begin...')
@@ -429,3 +430,42 @@ def import_sections_postgres(import_task):
         import_task.save()
     finally:
         mongo_client.disconnect_mongodb()
+
+
+def import_profiles_postgres(import_task):
+    print('---------------------------------------------')
+    print('profile import into postgres started')
+    filename = import_task.filename.name
+    remote_url = 'https://static.dev.campus.com/uploads/'
+    file_url = f'{remote_url}{filename}'
+    print('got valuable variables')
+    df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
+    data = df.T.to_dict()
+    print('got dataframe')
+    for key, row in data.items():
+        row = {k.strip(): str(v).strip() for (k, v) in row.items()}
+        data = {
+            'first_name': row['first_name'],
+            'last_name': row['last_name'],
+            'date_of_birth': row['date_of_birth'],
+            'primary_contact_number': row['primary_contact_number']
+        }
+
+        try:
+            profile, created = Profile.objects.update_or_create(
+                primary_email = row['primary_email'],
+                defaults = data
+            )
+            try:
+                profile_store = ProfileStore.objects.get(profile=profile, store=import_task.store)
+            except Profile.DoesNotExist:
+                profile_store = ProfileStore.objects.create(profile=profile, store=import_task.store)
+
+            import_task.queue_processed = 2
+            import_task.status = 'completed'
+
+        except Exception:
+            import_task.queue_processed = 2
+            import_task.status = 'failed'
+
+        import_task.save()
