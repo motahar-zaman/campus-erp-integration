@@ -19,6 +19,7 @@ from models.course.section_schedule import SectionSchedule
 from models.occupation.occupation import Occupation as OccupationModel
 from models.courseprovider.provider_site import CourseProviderSite
 from models.courseprovider.instructor import Instructor
+from datetime import datetime
 
 initialize_django()
 
@@ -48,7 +49,7 @@ def create_queue_postgres(import_task):
 
 def import_courses_mongo(import_task):
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     try:
@@ -123,7 +124,7 @@ def import_courses_mongo(import_task):
 
 def import_courses_postgres(import_task):
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
@@ -201,7 +202,7 @@ def get_section_instructors(import_task, row, instructors):
 def import_sections_mongo(import_task):
     print('begin...')
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     print('got valuable variables')
@@ -358,7 +359,7 @@ def import_sections_postgres(import_task):
     print('---------------------------------------------')
     print('section import into postgres started')
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
     print('got valuable variables')
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
@@ -433,12 +434,12 @@ def import_sections_postgres(import_task):
 
 
 def import_profiles_postgres(import_task):
-    print('---------------------------------------------')
-    print('profile import into postgres started')
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    try:
+        remote_url = config('STATIC_FILE_URL')
+    except Exception:
+        remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
-    print('got valuable variables')
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
     print('got dataframe')
@@ -447,7 +448,7 @@ def import_profiles_postgres(import_task):
         data = {
             'first_name': row['first_name'],
             'last_name': row['last_name'],
-            'date_of_birth': row['date_of_birth'],
+            'date_of_birth': datetime.strptime(row['date_of_birth'], '%Y-%m-%d %H:%M:%S'),
             'primary_contact_number': row['primary_contact_number']
         }
 
@@ -456,16 +457,17 @@ def import_profiles_postgres(import_task):
                 primary_email = row['primary_email'],
                 defaults = data
             )
+        except Exception as e:
+            import_task.queue_processed = 2
+            import_task.status = 'failed'
+        else:
             try:
-                profile_store = ProfileStore.objects.get(profile=profile, store=import_task.store)
-            except Profile.DoesNotExist:
-                profile_store = ProfileStore.objects.create(profile=profile, store=import_task.store)
+                profile_store = ProfileStore.objects.get_or_create(profile=profile, store=import_task.store)
+            except Exception as e:
+                import_task.queue_processed = 2
+                import_task.status = 'failed'
 
             import_task.queue_processed = 2
             import_task.status = 'completed'
-
-        except Exception:
-            import_task.queue_processed = 2
-            import_task.status = 'failed'
 
         import_task.save()
