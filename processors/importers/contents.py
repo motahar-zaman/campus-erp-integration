@@ -438,7 +438,7 @@ def import_profiles_postgres(import_task):
     try:
         remote_url = config('STATIC_FILE_URL')
     except Exception:
-        remote_url = 'https://static.dev.campus4i.com/uploads/'
+        remote_url = 'https://static.'+ config('ENV') +'.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
