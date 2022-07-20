@@ -1,4 +1,3 @@
-
 from bson import ObjectId
 from campuslibs.loggers.mongo import save_to_mongo
 from config import mongo_client
@@ -12,10 +11,7 @@ import json
 import pandas as pd
 import pika
 
-
-initialize_django()
-
-from shared_models.models import Course, Section
+from shared_models.models import Course, Section, Profile, ProfileStore
 from django_scopes import scopes_disabled
 from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
@@ -23,6 +19,9 @@ from models.course.section_schedule import SectionSchedule
 from models.occupation.occupation import Occupation as OccupationModel
 from models.courseprovider.provider_site import CourseProviderSite
 from models.courseprovider.instructor import Instructor
+from datetime import datetime
+
+initialize_django()
 
 
 def create_queue_postgres(import_task):
@@ -50,7 +49,7 @@ def create_queue_postgres(import_task):
 
 def import_courses_mongo(import_task):
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     try:
@@ -125,7 +124,7 @@ def import_courses_mongo(import_task):
 
 def import_courses_postgres(import_task):
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
@@ -173,6 +172,7 @@ def import_courses_postgres(import_task):
     finally:
         mongo_client.disconnect_mongodb()
 
+
 def get_section_schedules(import_task, row, schedules):
     try:
         schedules = schedules[row['code']]
@@ -180,6 +180,7 @@ def get_section_schedules(import_task, row, schedules):
         return []
 
     return [SectionSchedule(**item) for item in schedules]
+
 
 def get_section_instructors(import_task, row, instructors):
     try:
@@ -197,10 +198,11 @@ def get_section_instructors(import_task, row, instructors):
         ins.append(obj)
     return ins
 
+
 def import_sections_mongo(import_task):
     print('begin...')
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
     print('got valuable variables')
@@ -357,7 +359,7 @@ def import_sections_postgres(import_task):
     print('---------------------------------------------')
     print('section import into postgres started')
     filename = import_task.filename.name
-    remote_url = 'https://static.dev.campus.com/uploads/'
+    remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
     print('got valuable variables')
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
@@ -429,3 +431,43 @@ def import_sections_postgres(import_task):
         import_task.save()
     finally:
         mongo_client.disconnect_mongodb()
+
+
+def import_profiles_postgres(import_task):
+    filename = import_task.filename.name
+    try:
+        remote_url = config('STATIC_FILE_URL')
+    except Exception:
+        remote_url = 'https://static.'+ config('ENV') +'.campus4i.com/uploads/'
+    file_url = f'{remote_url}{filename}'
+    df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
+    data = df.T.to_dict()
+    print('got dataframe')
+    for key, row in data.items():
+        row = {k.strip(): str(v).strip() for (k, v) in row.items()}
+        data = {
+            'first_name': row['first_name'],
+            'last_name': row['last_name'],
+            'date_of_birth': datetime.strptime(row['date_of_birth'], '%Y-%m-%d %H:%M:%S'),
+            'primary_contact_number': row['primary_contact_number']
+        }
+
+        try:
+            profile, created = Profile.objects.update_or_create(
+                primary_email = row['primary_email'],
+                defaults = data
+            )
+        except Exception as e:
+            import_task.queue_processed = 2
+            import_task.status = 'failed'
+        else:
+            try:
+                profile_store = ProfileStore.objects.get_or_create(profile=profile, store=import_task.store)
+            except Exception as e:
+                import_task.queue_processed = 2
+                import_task.status = 'failed'
+
+            import_task.queue_processed = 2
+            import_task.status = 'completed'
+
+        import_task.save()
