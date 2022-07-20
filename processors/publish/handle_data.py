@@ -39,6 +39,7 @@ from processors.publish.create_data import CreateData
 from processors.publish.update_data import UpdateData
 from processors.publish.deactivate_data import DeactivateData
 from processors.publish.tag_data import TagData
+from processors.publish.untag_data import UntagData
 from processors.publish.store_course_publish import StoreCoursePublish
 
 from django_scopes import scopes_disabled
@@ -170,11 +171,19 @@ def publish(doc_id):
 
                 elif item['type'] == 'instructor':
                     deactivate_data.deactivate_instructor(doc, course_provider, course_provider_model, item)
+                elif item['type'] == 'question':
+                    deactivate_data.deactivate_question(doc, course_provider, course_provider_model, item)
 
         elif action == "record_tag":
             tag_data = TagData()
             for item in records:
                 if item['type'] == 'question':
                     tag_data.tag_question(doc, item, course_provider, course_provider_model)
+
+        elif action == "record_untag":
+            untag_data = UntagData()
+            for item in records:
+                if item['type'] == 'question':
+                    untag_data.untag_question(doc, course_provider, course_provider_model, item)
 
         print('message processing complete')

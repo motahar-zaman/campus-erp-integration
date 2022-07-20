@@ -24,7 +24,7 @@ from .serializers import CourseSerializer, SectionSerializer, CourseModelSeriali
 from config.mongo_client import connect_mongodb, disconnect_mongodb
 
 from shared_models.models import Course, CourseProvider, Section, CourseSharingContract, StoreCourse, Product,\
-    StoreCourseSection, Store, RelatedProduct
+    StoreCourseSection, Store, RelatedProduct, QuestionBank, PaymentQuestion, RegistrationQuestion, ProfileQuestion
 from models.courseprovider.course_provider import CourseProvider as CourseProviderModel
 from models.courseprovider.provider_site import CourseProviderSite as CourseProviderSiteModel
 from models.courseprovider.instructor import Instructor as InstructorModel
@@ -351,6 +351,48 @@ class DeactivateData():
         # inserted_item.message = 'error occurred'
         # inserted_item.save()
         # return False
+
+        inserted_item.message = 'task processed successfully'
+        inserted_item.status = 'completed'
+        inserted_item.save()
+        return True
+
+
+    def deactivate_question(self, doc, course_provider, course_provider_model, data):
+        # insert every item in mongo to get status individually
+        external_id = data['match'].get('question', '')
+        mongo_data = {
+            'data': data, 'publish_job_id': doc['id'], 'type': 'question_delete', 'time': timezone.now(),
+            'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id
+        }
+
+        log_serializer = PublishLogModelSerializer(data=mongo_data)
+        if log_serializer.is_valid():
+            inserted_item = log_serializer.save()
+        else:
+            print(log_serializer.errors)
+
+        with scopes_disabled():
+            try:
+                question = QuestionBank.objects.get(external_id=external_id)
+            except QuestionBank.DoesnotExist:
+                inserted_item.errors = {'question_bank': ['question_bank not found in database']}
+                inserted_item.status = 'failed'
+                inserted_item.message = 'error occurred'
+                inserted_item.save()
+                return False
+
+        if RegistrationQuestion.objects.filter(question_bank=question).exists() \
+                or ProfileQuestion.objects.filter(question_bank=question).exists()\
+                or PaymentQuestion.objects.filter(question_bank=question).exists():
+
+            inserted_item.errors = {'question_bank': ['Can not delete questions that are already in use!']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+
+        question.delete()
 
         inserted_item.message = 'task processed successfully'
         inserted_item.status = 'completed'
