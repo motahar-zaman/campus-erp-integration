@@ -41,6 +41,7 @@ from models.publish.publish_job import PublishJob as PublishJobModel
 from mongoengine import NotUniqueError
 from django.db import transaction
 from django_initializer import initialize_django
+import mongoengine
 
 initialize_django()
 
@@ -662,10 +663,31 @@ class UpdateData():
             return False
 
         else:
+            data['question_type'] = data['input'].get('type', question.question_type)
+            data['configuration'] = data['input'].get('config', question.configuration)
+            autocomplete = data['configuration'].get('autocomplete', False)
             question_bank_serializer = QuestionBankSerializer(question, data=data, partial=True)
 
+        collection = 'question_bank_options'
         if question_bank_serializer.is_valid():
-            question_bank_serializer.save()
+            qbank = question_bank_serializer.save()
+            if qbank.question_type == 'select' and autocomplete:
+                data = {
+                    'question_bank': str(qbank.id),
+                    'options': qbank.configuration.get('autocomplete_options', []),
+                    'datetime': datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+                }
+                query = {'question_bank': str(qbank.id)}
+
+                db = mongoengine.get_db()
+                coll = db[collection]
+                doc = coll.find_one(query)
+
+                if doc is None:
+                    coll.insert_one(data)
+                else:
+                    coll.update_one(query, {'$set': data}, upsert=True)
+
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'
         else:
