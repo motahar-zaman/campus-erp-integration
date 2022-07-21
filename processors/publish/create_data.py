@@ -35,6 +35,7 @@ from datetime import datetime
 import decimal
 import os
 from django.utils import timezone
+import mongoengine
 
 from django_scopes import scopes_disabled
 from models.publish.publish_job import PublishJob as PublishJobModel
@@ -698,6 +699,7 @@ class CreateData():
         data['provider_ref'] = course_provider.id
         data['question_type'] = data['input'].get('type', None)
         data['configuration'] = data['input'].get('config', {})
+        autocomplete = data['configuration'].get('autocomplete', False)
 
         try:
             question = QuestionBank.objects.get(external_id=data['external_id'], provider_ref=data['provider_ref'])
@@ -706,8 +708,26 @@ class CreateData():
         else:
             question_bank_serializer = QuestionBankSerializer(question, data=data, partial=True)
 
+        collection = 'question_bank_options'
         if question_bank_serializer.is_valid():
-            question_bank_serializer.save()
+            qbank = question_bank_serializer.save()
+            if qbank.question_type == 'select' and autocomplete:
+                data = {
+                    'question_bank': str(qbank.id),
+                    'options': qbank.configuration.get('autocomplete_options', []),
+                    'datetime': datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+                }
+                query = {'question_bank': str(qbank.id)}
+
+                db = mongoengine.get_db()
+                coll = db[collection]
+                doc = coll.find_one(query)
+
+                if doc is None:
+                    coll.insert_one(data)
+                else:
+                    coll.update_one(query, {'$set': data}, upsert=True)
+
             inserted_item.message = 'task processed successfully'
             inserted_item.status = 'completed'
         else:
