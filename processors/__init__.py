@@ -34,7 +34,7 @@ def enroll_callback(ch, method, properties, body):
         # print('* Enrolling')
         formatter = EnrollmentFormatter()
         data = formatter.enroll(payload)
-        print_log(data)
+        # print_log(data)
         # print('enrollment data formatted')
         enroll(data)
         # print('Done')
