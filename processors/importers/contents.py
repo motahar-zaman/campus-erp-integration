@@ -42,9 +42,9 @@ def create_queue_postgres(import_task):
         routing_key = 'section_postgres.import'
 
     channel.basic_publish(exchange='campusmq', routing_key=routing_key, body=json.dumps({'import_task_id': str(import_task.id)}))
-    print('Published data to MQ, closing connection')
+    # print('Published data to MQ, closing connection')
     connection.close()
-    print('Done')
+    # print('Done')
 
 
 def import_courses_mongo(import_task):
@@ -59,7 +59,7 @@ def import_courses_mongo(import_task):
         return
 
     data = df.T.to_dict()
-    print('got data from spreadsheet file')
+    # print('got data from spreadsheet file')
 
     try:
         mongo_client.connect_mongodb()
@@ -73,17 +73,17 @@ def import_courses_mongo(import_task):
             row['provider'] = ObjectId(import_task.course_provider.content_db_reference)
             row['_is_deleted'] = False
             try:
-                print('getting course document')
+                # print('getting course document')
                 course_model = CourseModel.with_deleted_objects(external_id=row['external_id'], provider=row['provider'])
 
                 raw_query = {'$set': row}
-                print('upserting course document')
+                # print('upserting course document')
                 course_model.update_one(__raw__=raw_query, upsert=True)
-                print('done')
+                # print('done')
 
             except Exception as e:
                 is_success = False
-                print('execption: ', str(e))
+                # print('execption: ', str(e))
                 import_task.status = 'failed'
                 msg = {'type': 'ImportTask', 'message': str(e), 'import_task_id': str(import_task.id), 'external_id': row['external_id']}
                 save_to_mongo(data=msg, collection='error_log')
@@ -95,7 +95,7 @@ def import_courses_mongo(import_task):
         except ValueError:
             pass
         else:
-            print('got career tagging data')
+            # print('got career tagging data')
             career_data = []
 
             for key, row in df2.T.to_dict().items():
@@ -103,13 +103,13 @@ def import_courses_mongo(import_task):
 
             for course_external_id, data in groupby(career_data, key=lambda x:x['course_external_id']):
                 soc_codes = [item['soc_code'] for item in list(data)]
-                print('updating course with career data: ', course_external_id, soc_codes)
+                # print('updating course with career data: ', course_external_id, soc_codes)
                 course_model = CourseModel.with_deleted_objects(external_id=course_external_id, provider=ObjectId(import_task.course_provider.content_db_reference))
                 course_model.update_one(
                     pull_all__careers=[item for item in OccupationModel.objects.all()]
                 )
                 course_model.update_one(add_to_set__careers=[career.id for career in OccupationModel.objects.filter(soc_code__in=soc_codes)])
-                print('career tagging complete')
+                # print('career tagging complete')
 
     finally:
         if is_success:
@@ -118,7 +118,7 @@ def import_courses_mongo(import_task):
             import_task.save()
             create_queue_postgres(import_task)
 
-        print('operation completed')
+        # print('operation completed')
         mongo_client.disconnect_mongodb()
 
 
@@ -200,21 +200,21 @@ def get_section_instructors(import_task, row, instructors):
 
 
 def import_sections_mongo(import_task):
-    print('begin...')
+    # print('begin...')
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
 
-    print('got valuable variables')
+    # print('got valuable variables')
     df = pd.read_excel(file_url, sheet_name=import_task.import_type, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
 
-    print('got data and converted to dataframe')
+    # print('got data and converted to dataframe')
 
     try:
-        print('trying to connect to mongodb')
+        # print('trying to connect to mongodb')
         mongo_client.connect_mongodb()
-        print('mongodb connected.')
+        # print('mongodb connected.')
         schedules_data = []
         schedules = {}
         try:
@@ -231,7 +231,7 @@ def import_sections_mongo(import_task):
                     sch_list.append(item)
                 schedules[section_code] = sch_list
 
-        print('got schedules data: ', schedules)
+        # print('got schedules data: ', schedules)
         instructors_data = []
         instructors = {}
         try:
@@ -248,7 +248,7 @@ def import_sections_mongo(import_task):
                     ins_list.append(item)
                 instructors[section_code] = ins_list
         # instructor and schedules data done
-        print('got instructors: ', instructors)
+        # print('got instructors: ', instructors)
         for key, row in data.items():
             row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
 
@@ -308,10 +308,10 @@ def import_sections_mongo(import_task):
 
             row['provider'] = ObjectId(import_task.course_provider.content_db_reference)
 
-            print('row so far: ', row)
+            # print('row so far: ', row)
             row['schedules'] = get_section_schedules(import_task, row, schedules)
             row['instructors'] = get_section_instructors(import_task, row, instructors)
-            print('added schedules and instructors to row')
+            # print('added schedules and instructors to row')
 
             try:
                 course_model = CourseModel.with_deleted_objects.get(external_id=row.pop('course_external_id'), provider=row.pop('provider'))
@@ -319,18 +319,18 @@ def import_sections_mongo(import_task):
                 import_task.queue_processed = 2
                 import_task.status = 'failed'
             else:
-                print('course model found')
+                # print('course model found')
                 if CourseModel.objects(id=course_model.id, sections__code=row['code']).count():
-                    print('section exists. updating')
+                    # print('section exists. updating')
                     CourseModel.objects(
                         id=course_model.id, sections__code=row['code']
                     ).update_one(set__sections__S=SectionModel(**row))
 
-                    print('section updated')
+                    # print('section updated')
                 else:
-                    print('section does not exists. creating')
+                    # print('section does not exists. creating')
                     CourseModel.objects(id=course_model.id).update_one(push__sections=SectionModel(**row))
-                    print('new section added to the course')
+                    # print('new section added to the course')
 
                 import_task.queue_processed = 2
         import_task.save()
@@ -339,7 +339,7 @@ def import_sections_mongo(import_task):
     finally:
         mongo_client.disconnect_mongodb()
 
-    print('queueing postgres task for importing sections')
+    # print('queueing postgres task for importing sections')
     create_queue_postgres(import_task)
 
 
@@ -356,18 +356,18 @@ def parse_date(date_str):
 
 
 def import_sections_postgres(import_task):
-    print('---------------------------------------------')
-    print('section import into postgres started')
+    # print('---------------------------------------------')
+    # print('section import into postgres started')
     filename = import_task.filename.name
     remote_url = 'https://static.dev.campus4i.com/uploads/'
     file_url = f'{remote_url}{filename}'
-    print('got valuable variables')
+    # print('got valuable variables')
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
-    print('got dataframe')
+    # print('got dataframe')
     try:
         mongo_client.connect_mongodb()
-        print('connected to mongodb')
+        # print('connected to mongodb')
         for key, row in data.items():
             row = {k.strip().replace('*', ''): str(v).strip() for (k, v) in row.items()}
             if row['available_seats'] == '':
@@ -383,7 +383,7 @@ def import_sections_postgres(import_task):
                 import_task.queue_processed = 2
                 import_task.status = 'failed'
             else:
-                print('got course model')
+                # print('got course model')
                 with scopes_disabled():
                     try:
                         course = Course.objects.get(course_provider=import_task.course_provider, content_db_reference=str(course_model.id))
@@ -391,7 +391,7 @@ def import_sections_postgres(import_task):
                         import_task.queue_processed = 2
                         import_task.status = 'failed'
                     else:
-                        print('got course object')
+                        # print('got course object')
                         try:
                             section = Section.objects.get(course=course, name=row['code'])
                         except Section.DoesNotExist:
@@ -409,7 +409,7 @@ def import_sections_postgres(import_task):
                                 end_date=parse_date(row['end_date']),
                                 execution_site=row['execution_site'],
                             )
-                            print('created new section')
+                            # print('created new section')
                         else:
                             section.name = row['code']
                             section.fee = row['course_fee']
@@ -423,7 +423,7 @@ def import_sections_postgres(import_task):
                             section.end_date = row['end_date']
                             section.execution_site = row['execution_site']
                             section.save()
-                            print('updated section')
+                            # print('updated section')
 
                         import_task.queue_processed = 2
                         import_task.status = 'completed'
@@ -442,7 +442,7 @@ def import_profiles_postgres(import_task):
     file_url = f'{remote_url}{filename}'
     df = pd.read_excel(file_url, na_values=str, keep_default_na=False)
     data = df.T.to_dict()
-    print('got dataframe')
+    # print('got dataframe')
     for key, row in data.items():
         row = {k.strip(): str(v).strip() for (k, v) in row.items()}
         data = {

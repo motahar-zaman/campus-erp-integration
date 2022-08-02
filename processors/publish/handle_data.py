@@ -186,4 +186,4 @@ def publish(doc_id):
                 if item['type'] == 'question':
                     untag_data.untag_question(doc, course_provider, course_provider_model, item)
 
-        print('message processing complete')
+        # print('message processing complete')
