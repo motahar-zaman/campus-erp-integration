@@ -1,7 +1,7 @@
 from services.mindedge import MindEdgeService
 
 def handle_mindedge_enrollment(profile, data, message_data, enrollment):
-    print('*** mindedge ***')
+    # print('*** mindedge ***')
     return
     try:
         store_configuration = store.store_configurations.get(
