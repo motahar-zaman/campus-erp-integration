@@ -578,7 +578,7 @@ class CreateData():
         else:
             print(log_serializer.errors)
 
-        data = item['data']
+        data = item.get('data', [])
         data['slug'] = slugify(data['title'])
         data['from_importer'] = True
         # description is required at C4I, if not provided by partner, we will put tiltle value here
@@ -587,7 +587,7 @@ class CreateData():
         # getting courses from given course external_id
         courses = []
         course_models = []
-        for tagging_course in item['related_records']:
+        for tagging_course in item.get('related_records', []):
             if tagging_course.get('type', '') == 'course':
                 try:
                     course_model = CourseModel.objects.get(
@@ -616,7 +616,7 @@ class CreateData():
         # create catalog for that store
         # tag catalog with store course
 
-        for store_slug in item['publishing_stores']:
+        for store_slug in item.get('publishing_stores', []):
             try:
                 store = Store.objects.get(url_slug=store_slug)
             except Store.DoesNotExist:
