@@ -53,7 +53,7 @@ class EnrollmentFormatter(object):
 
         # getting student id
         school_student_id = ''
-        student_profiles = StudentProfile.objects.filter(profile=profile)
+        student_profiles = StudentProfile.objects.filter(profile=profile, course_provider=course_enrollment.course.course_provider)
         if student_profiles.exists():
             school_student_id = student_profiles.first().external_profile_id
 
