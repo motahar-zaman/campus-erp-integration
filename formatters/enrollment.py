@@ -19,6 +19,10 @@ class EnrollmentFormatter(object):
                 'cid': external_id,
                 'login_link': True
             },
+            'store': {
+                'slug': course_enrollment.store.url_slug,
+                'name': course_enrollment.store.name
+            },
             'profile': {'primary_email': profile.primary_email, 'first_name': profile.first_name, 'last_name': profile.last_name},
             'action': 'enroll',
             'enrollment_type': 'course',
@@ -49,7 +53,7 @@ class EnrollmentFormatter(object):
 
         # getting student id
         school_student_id = ''
-        student_profiles = StudentProfile.objects.filter(profile=profile)
+        student_profiles = StudentProfile.objects.filter(profile=profile, course_provider=course_enrollment.course.course_provider)
         if student_profiles.exists():
             school_student_id = student_profiles.first().external_profile_id
 
@@ -133,6 +137,10 @@ class EnrollmentFormatter(object):
                     j1_config = course_enrollment.course.course_provider.configuration
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    j1_data['store']= {
+                        'slug': course_enrollment.store.url_slug,
+                        'name': course_enrollment.store.name
+                    }
                     j1_data['payment'] = {
                         'amount': str(payment.amount),
                         'currency_code': payment.currency_code,
@@ -162,6 +170,10 @@ class EnrollmentFormatter(object):
                     hir_config = course_enrollment.course.course_provider.configuration
                     hir_data['order_id'] = str(payment.cart.order_ref)
                     hir_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    hir_data['store'] = {
+                        'slug': course_enrollment.store.url_slug,
+                        'name': course_enrollment.store.name
+                    }
                     hir_data['payment'] = {
                         'amount': str(payment.amount),
                         'currency_code': payment.currency_code,
