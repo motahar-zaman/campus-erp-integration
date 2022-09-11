@@ -29,7 +29,7 @@ def handle_enrollment(data, config):
                 response.raise_for_status()
             except requests.exceptions.RequestException as err:
                 requeue_no += 1
-                if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
+                if requeue_no > config('TASK_MAX_RETRY_COUNT'):
                     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
                     return {'message': str(err)}
             else:
@@ -45,7 +45,7 @@ def handle_enrollment(data, config):
                 response.raise_for_status()
             except requests.exceptions.RequestException as err:
                 requeue_no += 1
-                if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
+                if requeue_no > config('TASK_MAX_RETRY_COUNT'):
                     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
                     return {'message': str(err)}
             else:

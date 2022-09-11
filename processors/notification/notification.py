@@ -86,7 +86,7 @@ def send_message_to_course_provider(url, data):
             response.raise_for_status()
         except requests.exceptions.RequestException as err:
             requeue_no += 1
-            if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
+            if requeue_no > config('TASK_MAX_RETRY_COUNT'):
                 return False, str(err)
         else:
             break
