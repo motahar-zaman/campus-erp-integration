@@ -3,6 +3,7 @@ from multiprocessing.sharedctypes import Value
 import requests
 from campuslibs.loggers.mongo import save_to_mongo
 from decouple import config
+import time
 
 def handle_enrollment(data, config):
     headers = {
@@ -28,7 +29,7 @@ def handle_enrollment(data, config):
                 response.raise_for_status()
             except requests.exceptions.RequestException as err:
                 requeue_no += 1
-                if requeue_no > config('REQUEUE_MSG'):
+                if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
                     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
                     return {'message': str(err)}
             else:
@@ -44,11 +45,12 @@ def handle_enrollment(data, config):
                 response.raise_for_status()
             except requests.exceptions.RequestException as err:
                 requeue_no += 1
-                if requeue_no > config('REQUEUE_MSG'):
+                if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
                     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
                     return {'message': str(err)}
             else:
                 break
+        time.sleep(config('RETRY_INTERVAL'))
 
     resp = {}
     try:

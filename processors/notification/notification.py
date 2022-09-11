@@ -5,6 +5,7 @@ from django.utils import timezone
 from shared_models.models import Notification, NotificationLog, Event, Payment, Cart, EventSubscription, Partner
 from django_scopes import scopes_disabled
 import requests
+import time
 
 
 def notification_to_course_provider(notification_id):
@@ -31,7 +32,6 @@ def notification_to_course_provider(notification_id):
                 except Cart.DoesNotExist:
                     return False
 
-        print(order.cart_items.all())
 
         for item in order.cart_items.all():
             course_provider = item.product.store_course_section.store_course.course.course_provider
@@ -49,7 +49,6 @@ def notification_to_course_provider(notification_id):
                 pass
 
             if subscribed:
-                print('subscribed')
                 url = partner.notification_submission_url
 
                 data = {
@@ -87,10 +86,11 @@ def send_message_to_course_provider(url, data):
             response.raise_for_status()
         except requests.exceptions.RequestException as err:
             requeue_no += 1
-            if requeue_no > config('REQUEUE_MSG'):
+            if requeue_no > config('MAX_RETRY_QUEUE_COUNT'):
                 return False, str(err)
         else:
             break
+        time.sleep(config('RETRY_INTERVAL'))
     try:
         resp = response.json()
     except ValueError:
