@@ -30,35 +30,24 @@ def enroll_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
     if 'enrollment' in method.routing_key:
-        # print_log(payload)
-        # print('* Enrolling')
         formatter = EnrollmentFormatter()
         data = formatter.enroll(payload)
-        # print_log(data)
-        # print('enrollment data formatted')
-        enroll(data)
-        # print('Done')
+        enroll(data, payload, ch)
 
     if 'crm_user' in method.routing_key:
-        # print('Adding/updating user to crm')
         formatter = CRMFormatter()
         data = formatter.add_or_update_user(payload)
         add_or_update_user(data)
-        # print('Done')
 
     if 'crm_product' in method.routing_key:
-        # print('Adding/updating product to crm')
         formatter = CRMFormatter()
         data = formatter.add_or_update_product(payload)
         add_or_update_product(data)
-        # print('Done')
 
     if 'tax' in method.routing_key:
-        # print('* Adding tax info to avatax')
         formatter = TaxFormatter()
         data = formatter.tax_create(payload)
         tax_create(data)
-        # print('Done')
 
 
 def refund_callback(ch, method, properties, body):
@@ -133,4 +122,4 @@ def publish_callback(ch, method, properties, body):
 def notification_callback(ch, method, properties, body):
     time.sleep(10)  # Sleep for 10 seconds to create cart items
     payload = json.loads(body.decode())
-    notification_to_course_provider(payload['notification_id'])
+    notification_to_course_provider(payload['notification_id'], payload, ch)

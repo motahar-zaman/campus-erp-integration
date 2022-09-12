@@ -8,7 +8,7 @@ import requests
 import time
 
 
-def notification_to_course_provider(notification_id):
+def notification_to_course_provider(notification_id, payload, ch):
     try:
         notification = Notification.objects.get(pk=notification_id)
     except Notification.DoesNotExist:
@@ -56,7 +56,7 @@ def notification_to_course_provider(notification_id):
                     'notification_type': notification_type,
                     'message': 'you got an '+notification_type
                 }
-                send_msg, response = send_message_to_course_provider(url, data)
+                send_msg, response = send_message_to_course_provider(url, data, payload, ch)
                 if send_msg:
                     notification.status = Notification.STATUS_SUCCESSFUL
                 else:
@@ -74,11 +74,13 @@ def notification_to_course_provider(notification_id):
     return True
 
 
-def send_message_to_course_provider(url, data):
+def send_message_to_course_provider(url, data, payload, ch):
     headers = {
         'Content-Type': 'application/json'
     }
     requeue_no = 1
+    exchange_dead_letter = 'dlx'
+    routing_key = 'notification'
 
     while(requeue_no):
         try:
@@ -86,11 +88,14 @@ def send_message_to_course_provider(url, data):
             response.raise_for_status()
         except requests.exceptions.RequestException as err:
             requeue_no += 1
-            if requeue_no > config('TASK_MAX_RETRY_COUNT'):
+            if requeue_no > int(config('TASK_MAX_RETRY_COUNT')):
+                if payload['retry_queue_count'] < int(config('MAX_DEADLETTER_QUEUE_COUNT')):
+                    payload['retry_queue_count'] += 1
+                    ch.basic_publish(exchange=exchange_dead_letter, routing_key=routing_key, body=json.dumps(payload))
                 return False, str(err)
         else:
             break
-        time.sleep(config('RETRY_INTERVAL'))
+        time.sleep(requeue_no * int(config('RETRY_INTERVAL')))
     try:
         resp = response.json()
     except ValueError:

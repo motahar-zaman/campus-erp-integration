@@ -12,10 +12,12 @@ def main():
     AMQP_PORT = config('AMQP_PORT')
     amqp_url = f'amqps://{AMQP_USER}:{AMQP_PASS}@{AMQP_HOST}:{AMQP_PORT}?connection_attempts=5&retry_delay=5'
     exchange_campus = 'campusmq'
+    exchange_dead_letter = 'dlx'
 
     connection = pika.BlockingConnection(pika.URLParameters(amqp_url))
     channel = connection.channel()
     channel.exchange_declare(exchange=exchange_campus, exchange_type='topic')
+    channel.exchange_declare(exchange=exchange_dead_letter, exchange_type='topic')
 
     queue_enroll = 'mq_enroll'
     channel.queue_declare(queue_enroll, exclusive=True)
