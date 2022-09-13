@@ -24,6 +24,11 @@ def main():
     channel.queue_bind(exchange=exchange_campus, queue=queue_enroll, routing_key='*.enroll')
     channel.basic_consume(queue=queue_enroll, on_message_callback=enroll_callback, auto_ack=True)
 
+    queue_dlx = 'dlx_queue'
+    channel.queue_declare(queue_dlx, exclusive=True)
+    channel.queue_bind(exchange=exchange_dead_letter, queue=queue_dlx, routing_key='*.enroll')
+    channel.basic_consume(queue=queue_dlx, on_message_callback=enroll_callback, auto_ack=True)
+
     queue_import = 'mq_import'
     channel.queue_declare(queue_import, exclusive=True)
     channel.queue_bind(exchange=exchange_campus, queue=queue_import, routing_key='*.import')
