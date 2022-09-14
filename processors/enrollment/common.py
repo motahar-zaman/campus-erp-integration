@@ -10,7 +10,7 @@ from shared_models.models import Certificate, Course, CourseEnrollment, PaymentR
 from .mindedge import handle_mindedge_enrollment
 from .j1 import handle_enrollment
 
-def enroll(enrollment_data, payload, ch):
+def enroll(enrollment_data, payload, ch, method, properties):
     payment = enrollment_data['payment']
 
     for item in enrollment_data['erp_list']:
@@ -37,7 +37,7 @@ def enroll(enrollment_data, payload, ch):
                 cart = payment.cart
                 cart.enrollment_request = {'request': item['data']}
                 cart.save()
-                resp = handle_enrollment(item['data'], item['config'], payload, ch)
+                resp = handle_enrollment(item['data'], item['config'], payload, ch, method, properties)
                 cart.enrollment_request['response'] = resp
                 cart.save()
         else:

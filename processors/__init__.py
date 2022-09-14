@@ -15,6 +15,7 @@ from processors.notification.notification import notification_to_course_provider
 
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
+from django.utils import timezone
 
 def print_log(data):
     print('------------------------------------')
@@ -30,9 +31,12 @@ def enroll_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
     if 'enrollment' in method.routing_key:
-        formatter = EnrollmentFormatter()
-        data = formatter.enroll(payload)
-        enroll(data, payload, ch)
+        if payload['retry_count'] > 0 and str(timezone.now()) < payload['next_request_time']:
+            ch.basic_publish(exchange='campusmq', routing_key='enrollment.enroll', body=json.dumps(payload))
+        else:
+            formatter = EnrollmentFormatter()
+            data = formatter.enroll(payload)
+            enroll(data, payload, ch, method, properties)
 
     if 'crm_user' in method.routing_key:
         formatter = CRMFormatter()
