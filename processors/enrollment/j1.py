@@ -63,6 +63,8 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
             return {'message': str(err)}
+        else:
+            ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
 
     resp = {}
     try:
