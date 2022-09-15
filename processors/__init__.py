@@ -32,7 +32,7 @@ def enroll_callback(ch, method, properties, body):
 
     if 'enrollment' in method.routing_key:
         if payload['retry_count'] > 0 and str(timezone.now()) < payload['next_request_time']:
-            ch.basic_publish(exchange='campusmq', routing_key='enrollment.enroll', body=json.dumps(payload))
+            ch.basic_reject(delivery_tag=method.delivery_tag)
         else:
             formatter = EnrollmentFormatter()
             data = formatter.enroll(payload)
