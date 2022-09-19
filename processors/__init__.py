@@ -15,6 +15,7 @@ from processors.notification.notification import notification_to_course_provider
 
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
+from django.utils import timezone
 
 def print_log(data):
     print('------------------------------------')
@@ -30,35 +31,27 @@ def enroll_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
 
     if 'enrollment' in method.routing_key:
-        # print_log(payload)
-        # print('* Enrolling')
-        formatter = EnrollmentFormatter()
-        data = formatter.enroll(payload)
-        # print_log(data)
-        # print('enrollment data formatted')
-        enroll(data)
-        # print('Done')
+        if payload['retry_count'] > 0 and str(timezone.now()) < payload['next_request_time']:
+            ch.basic_reject(delivery_tag=method.delivery_tag)
+        else:
+            formatter = EnrollmentFormatter()
+            data = formatter.enroll(payload)
+            enroll(data, payload, ch, method, properties)
 
     if 'crm_user' in method.routing_key:
-        # print('Adding/updating user to crm')
         formatter = CRMFormatter()
         data = formatter.add_or_update_user(payload)
         add_or_update_user(data)
-        # print('Done')
 
     if 'crm_product' in method.routing_key:
-        # print('Adding/updating product to crm')
         formatter = CRMFormatter()
         data = formatter.add_or_update_product(payload)
         add_or_update_product(data)
-        # print('Done')
 
     if 'tax' in method.routing_key:
-        # print('* Adding tax info to avatax')
         formatter = TaxFormatter()
         data = formatter.tax_create(payload)
         tax_create(data)
-        # print('Done')
 
 
 def refund_callback(ch, method, properties, body):
