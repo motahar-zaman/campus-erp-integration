@@ -12,6 +12,7 @@ from processors.importers.contents import import_courses_mongo, import_courses_p
     import_sections_postgres, import_profiles_postgres
 from processors.publish.handle_data import publish
 from processors.notification.notification import notification_to_course_provider
+from processors.course_sharing_contact.deactivate_course_sharing_contact import deactivate_course_sharing_contact
 
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
@@ -127,3 +128,8 @@ def notification_callback(ch, method, properties, body):
     time.sleep(10)  # Sleep for 10 seconds to create cart items
     payload = json.loads(body.decode())
     notification_to_course_provider(payload['notification_id'])
+
+
+def course_sharing_contact_callback(ch, method, properties, body):
+    payload = json.loads(body.decode())
+    deactivate_course_sharing_contact(payload)

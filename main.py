@@ -2,7 +2,8 @@ import pika
 import sys
 import os
 from decouple import config
-from processors import enroll_callback, refund_callback, import_callback, publish_callback, notification_callback
+from processors import enroll_callback, refund_callback, import_callback, publish_callback, notification_callback,\
+    course_sharing_contact_callback
 
 
 def main():
@@ -43,6 +44,11 @@ def main():
     channel.queue_declare(queue_notification, exclusive=True)
     channel.queue_bind(exchange=exchange_campus, queue=queue_notification, routing_key='notification')
     channel.basic_consume(queue=queue_notification, on_message_callback=notification_callback, auto_ack=True)
+
+    queue_contract = 'mq_course_sharing_contact'
+    channel.queue_declare(queue_contract, exclusive=True)
+    channel.queue_bind(exchange=exchange_campus, queue=queue_contract, routing_key='course_sharing_contact')
+    channel.basic_consume(queue=queue_contract, on_message_callback=course_sharing_contact_callback, auto_ack=True)
 
     import_queue = channel.queue_declare('', exclusive=True)
     channel.queue_bind(exchange='campusmq', queue=import_queue.method.queue, routing_key='*.publish')
