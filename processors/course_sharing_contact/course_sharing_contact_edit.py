@@ -9,7 +9,7 @@ from ..publish.helpers import es_course_unpublish
 from django.db import transaction
 
 
-def deactivate_course_sharing_contact(payload):
+def course_sharing_contact_edit(payload, ch, method):
     course_provider = payload['course_provider']
     is_active = payload['is_active']
     store = payload['store']
@@ -34,4 +34,5 @@ def deactivate_course_sharing_contact(payload):
 
                 for store_course in store_courses:
                     es_course_unpublish(store_course)
+            ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
     return True

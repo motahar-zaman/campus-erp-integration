@@ -12,7 +12,7 @@ from processors.importers.contents import import_courses_mongo, import_courses_p
     import_sections_postgres, import_profiles_postgres
 from processors.publish.handle_data import publish
 from processors.notification.notification import notification_to_course_provider
-from processors.course_sharing_contact.deactivate_course_sharing_contact import deactivate_course_sharing_contact
+from processors.course_sharing_contact.course_sharing_contact_edit import course_sharing_contact_edit
 
 from loggers.elastic_search import upload_log
 from shared_models.models import CourseEnrollment, Notification, Event, Payment, Cart
@@ -132,4 +132,4 @@ def notification_callback(ch, method, properties, body):
 
 def course_sharing_contact_callback(ch, method, properties, body):
     payload = json.loads(body.decode())
-    deactivate_course_sharing_contact(payload)
+    course_sharing_contact_edit(payload, ch, method)

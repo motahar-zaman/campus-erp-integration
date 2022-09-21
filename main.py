@@ -48,7 +48,7 @@ def main():
     queue_contract = 'mq_course_sharing_contact'
     channel.queue_declare(queue_contract, exclusive=True)
     channel.queue_bind(exchange=exchange_campus, queue=queue_contract, routing_key='course_sharing_contact')
-    channel.basic_consume(queue=queue_contract, on_message_callback=course_sharing_contact_callback, auto_ack=True)
+    channel.basic_consume(queue=queue_contract, on_message_callback=course_sharing_contact_callback, auto_ack=False)
 
     import_queue = channel.queue_declare('', exclusive=True)
     channel.queue_bind(exchange='campusmq', queue=import_queue.method.queue, routing_key='*.publish')
