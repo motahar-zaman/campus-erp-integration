@@ -30,7 +30,7 @@ def course_sharing_contact_edit(payload, ch, method):
                         id__in=[scs.product.id for scs in store_course_sections]
                     ).update(active_status=False)
 
-                    store_courses.update(active_status=False, enrollment_ready=False)
+                    store_courses.update(is_published=False, is_featured=False, active_status=False, enrollment_ready=False)
 
                 for store_course in store_courses:
                     es_course_unpublish(store_course)
