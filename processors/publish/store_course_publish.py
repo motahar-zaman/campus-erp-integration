@@ -119,7 +119,7 @@ class StoreCoursePublish():
                                     store=store,
                                     external_id=course_obj.external_id,
                                     product_type=Product.PRODUCT_TYPE_SECTION,
-                                    title=course.title,
+                                    title=course.title + ' ( ' + section.name + ' )',
                                     content={},
                                     limit_applicable=False,
                                     total_quantity=section.seat_capacity,
