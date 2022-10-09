@@ -124,7 +124,7 @@ class StoreCoursePublish():
                                     limit_applicable=False,
                                     total_quantity=section.seat_capacity,
                                     quantity_sold=0,
-                                    available_quantity=section.seat_capacity,
+                                    available_quantity=section.available_seat,
                                     tax_code=config('AVATAX_TAX_CODE', 'ST080031'),
                                     fee=section.fee,
                                     minimum_fee=section.fee,
