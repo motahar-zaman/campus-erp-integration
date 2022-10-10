@@ -86,17 +86,19 @@ class EnrollmentFormatter(object):
         }
 
     def enroll(self, payload):
-        print('------------------------------------')
-        print(payload)
-        print('------------------------------------')
         mindedge_data = []
+        hir_data = {
+            'enrollments': []
+        }
         common_data = []
         j1_data = {
             'enrollments': []
         }
-        j1_enrollment_url = None
-        mindedge_enrollment_url = None
-        common_enrollment_url = None
+
+        mindedge_config = {}
+        j1_config = {}
+        hir_config = {}
+        common_config = {}
 
         payment = None
         try:
@@ -123,12 +125,12 @@ class EnrollmentFormatter(object):
                 except KeyError:
                     enrollment_url = 'http://PDSVC-UNITY.JENZABARCLOUD.COM:9090/ws/rest/campus/api/enrollment/create' #j1 provider url
 
-                if course_enrollment.course.course_provider.configuration['erp'] == 'mindedge':
+                if course_enrollment.course.course_provider.configuration.get('erp', '') == 'mindedge':
                     mindedge_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
-                    mindedge_enrollment_url = enrollment_url
+                    mindedge_config = course_enrollment.course.course_provider.configuration
 
-                elif course_enrollment.course.course_provider.configuration['erp'] == 'j1':
-                    j1_enrollment_url = enrollment_url
+                elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
+                    j1_config = course_enrollment.course.course_provider.configuration
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
                     j1_data['payment'] = {
@@ -155,9 +157,40 @@ class EnrollmentFormatter(object):
                             continue
                         agreement_details[question.external_id] = val
                     j1_data['agreement_details'] = agreement_details
+
+                elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'hir':
+                    hir_config = course_enrollment.course.course_provider.configuration
+                    hir_data['order_id'] = str(payment.cart.order_ref)
+                    hir_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
+                    hir_data['payment'] = {
+                        'amount': str(payment.amount),
+                        'currency_code': payment.currency_code,
+                        'transaction_reference': payment.transaction_reference,
+                        'auth_code': payment.auth_code,
+                        'payment_type': payment.payment_type,
+                        'bank': payment.bank,
+                        'account_number': payment.account_number,
+                        'card_type': payment.card_type,
+                        'card_number': payment.card_number,
+                        'reason_code': payment.reason_code,
+                        'reason_description': payment.reason_description,
+                        'customer_ip': payment.customer_ip,
+                        'status': payment.status,
+                        'transaction_time': str(payment.transaction_time),
+                    }
+                    agreement_details = {}
+                    for key, val in payment.cart.agreement_details.items():
+                        try:
+                            question = QuestionBank.objects.get(id=key)
+                        except (QuestionBank.DoesNotExist, ValidationError):
+                            continue
+                        agreement_details[question.external_id] = val
+                    hir_data['agreement_details'] = agreement_details
+
                 else:
                     common_data.append(self.mindedge(profile, external_id, course_enrollment, payment, payload))
-                    common_enrollment_url = enrollment_url
+                    common_config = course_enrollment.course.course_provider.configuration
+
         except Payment.DoesNotExist:
             pass
 
@@ -165,15 +198,19 @@ class EnrollmentFormatter(object):
             'erp_list':[{
                 'erp': 'mindedge',
                 'data': mindedge_data,
-                'enrollment_url': mindedge_enrollment_url
+                'config': mindedge_config
             }, {
                 'erp': 'j1',
                 'data': j1_data,
-                'enrollment_url': j1_enrollment_url
+                'config': j1_config
+            }, {
+                'erp': 'hir',
+                'data': hir_data,
+                'config': hir_config
             }, {
                 'erp': 'none',
                 'data': common_data,
-                'enrollment_url': common_enrollment_url
+                'config': common_config
             }],
             'payment': payment,
             'store_payment_gateway_id': payload['store_payment_gateway_id']
