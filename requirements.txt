@@ -30,7 +30,8 @@ ipython==7.20.0
 ipython-genutils==0.2.0
 jedi==0.18.0
 jmespath==0.10.0
-kombu==5.2.8
+kombu==4.6.7
+importlib-metadata==4.13.0
 lockfile==0.12.2
 mailchecker==4.0.6
 msgpack==0.6.2
