@@ -3,7 +3,7 @@ import sys
 import os
 from decouple import config
 from processors import enroll_callback, refund_callback, import_callback, publish_callback, notification_callback,\
-    course_sharing_contact_callback
+    course_sharing_contact_callback, enrollment_cancel_callback
 
 
 def main():
@@ -24,6 +24,11 @@ def main():
     channel.queue_declare(queue_enroll, exclusive=True)
     channel.queue_bind(exchange=exchange_campus, queue=queue_enroll, routing_key='*.enroll')
     channel.basic_consume(queue=queue_enroll, on_message_callback=enroll_callback, auto_ack=False)
+
+    queue_enroll = 'mq_enroll'
+    channel.queue_declare(queue_enroll, exclusive=True)
+    channel.queue_bind(exchange=exchange_campus, queue=queue_enroll, routing_key='enrollment.cancel')
+    channel.basic_consume(queue=queue_enroll, on_message_callback=enrollment_cancel_callback, auto_ack=False)
 
     queue_dlx = 'dlx_queue'
     channel.queue_declare(queue_dlx, exclusive=True)
