@@ -25,10 +25,10 @@ def main():
     channel.queue_bind(exchange=exchange_campus, queue=queue_enroll, routing_key='*.enroll')
     channel.basic_consume(queue=queue_enroll, on_message_callback=enroll_callback, auto_ack=False)
 
-    queue_enroll = 'mq_enroll'
-    channel.queue_declare(queue_enroll, exclusive=True)
-    channel.queue_bind(exchange=exchange_campus, queue=queue_enroll, routing_key='enrollment.cancel')
-    channel.basic_consume(queue=queue_enroll, on_message_callback=enrollment_cancel_callback, auto_ack=False)
+    queue_enroll_cancel = 'mq_enroll_cancel'
+    channel.queue_declare(queue_enroll_cancel, exclusive=True)
+    channel.queue_bind(exchange=exchange_campus, queue=queue_enroll_cancel, routing_key='enrollment.cancel')
+    channel.basic_consume(queue=queue_enroll_cancel, on_message_callback=enrollment_cancel_callback, auto_ack=False)
 
     queue_dlx = 'dlx_queue'
     channel.queue_declare(queue_dlx, exclusive=True)
