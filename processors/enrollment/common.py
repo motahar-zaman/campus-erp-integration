@@ -8,9 +8,9 @@ initialize_django()
 
 from shared_models.models import Certificate, Course, CourseEnrollment, PaymentRefund, StorePaymentGateway, CourseProvider
 from .mindedge import handle_mindedge_enrollment
-from .j1 import handle_enrollment
+from .j1 import handle_enrollment, handle_enrollment_cancellation
 
-def enroll(enrollment_data):
+def enroll(enrollment_data, payload, ch, method, properties):
     payment = enrollment_data['payment']
 
     for item in enrollment_data['erp_list']:
@@ -37,7 +37,7 @@ def enroll(enrollment_data):
                 cart = payment.cart
                 cart.enrollment_request = {'request': item['data']}
                 cart.save()
-                resp = handle_enrollment(item['data'], item['config'])
+                resp = handle_enrollment(item['data'], item['config'], payload, ch, method, properties)
                 cart.enrollment_request['response'] = resp
                 cart.save()
         else:
@@ -105,3 +105,6 @@ def unenroll(data):
         refund.task_cancel_enrollment = PaymentRefund.TASK_STATUS_FAILED
     refund.save()
     return refund
+
+def cancel_enrollment(data, payload, ch, method, properties):
+    return handle_enrollment_cancellation(data['data'], data['config'], payload, ch, method, properties)

@@ -267,3 +267,23 @@ class EnrollmentFormatter(object):
         }
 
         return data
+
+
+    def enrollment_cancel(self, payload):
+        with scopes_disabled():
+            try:
+                course_enrollment = CourseEnrollment.objects.get(pk=payload['course_enrollment_id'])
+            except CourseEnrollment.DoesNotExist:
+                return False
+            else:
+                config = course_enrollment.course.course_provider.configuration
+                data = {
+                    "event_type": "enrollment_cancel",
+                    'order_id': str(course_enrollment.cart_item.cart.order_ref),
+                    'enrollment_id': str(course_enrollment.ref_id)
+                }
+
+        return {
+            'data': data,
+            'config': config
+        }
