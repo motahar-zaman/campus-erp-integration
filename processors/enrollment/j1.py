@@ -78,7 +78,6 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
 
 
 def handle_enrollment_cancellation(data, configuration, payload, ch, method, properties):
-    print('handle_enrollment_cancellation')
     headers = {
         'Content-Type': 'application/json'
     }
@@ -88,7 +87,6 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
     routing_key = 'enrollment.cancel'
 
     if configuration.get('auth_type', '') == 'basic':
-        print('basic')
         try:
             response = requests.request(
                 "POST",
@@ -101,9 +99,7 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
                 data=json.dumps(data)
             )
             response.raise_for_status()
-            print(response)
         except requests.exceptions.RequestException as err:
-            print('retry' + payload['retry_count'])
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
                 payload['next_request_time'] = str(
@@ -117,7 +113,6 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
             return {'message': str(err)}
 
     else:
-        print('normal')
         try:
             response = requests.request(
                 "POST",
@@ -127,7 +122,6 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as err:
-            print('retry' + payload['retry_count'])
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
                 payload['next_request_time'] = str(timezone.now() + timezone.timedelta(seconds = payload['retry_count'] * int(config('RETRY_INTERVAL'))))
@@ -144,8 +138,6 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
     resp = {}
     try:
         resp = response.json()
-        print('resp')
-        print(resp)
     except ValueError:
         resp = {'message': 'invalid response received'}
         save_to_mongo(data={'erp': 'j1:response', 'data': {'message': 'invalid response received'}}, collection='erp_response')
