@@ -5,7 +5,7 @@ from formatters.crm import CRMFormatter
 from formatters.tax import TaxFormatter
 from formatters.importers import ImportFormatter
 
-from processors.enrollment.common import enroll, unenroll
+from processors.enrollment.common import enroll, unenroll, cancel_enrollment
 from processors.crm.hubspot import add_or_update_user, add_or_update_product
 from processors.tax.avatax import tax_create, tax_refund
 from processors.importers.contents import import_courses_mongo, import_courses_postgres, import_sections_mongo,\
@@ -53,6 +53,17 @@ def enroll_callback(ch, method, properties, body):
         formatter = TaxFormatter()
         data = formatter.tax_create(payload)
         tax_create(data)
+
+
+def enrollment_cancel_callback(ch, method, properties, body):
+    payload = json.loads(body.decode())
+
+    if payload['retry_count'] > 0 and str(timezone.now()) < payload['next_request_time']:
+        ch.basic_reject(delivery_tag=method.delivery_tag)
+    else:
+        formatter = EnrollmentFormatter()
+        data = formatter.enrollment_cancel(payload)
+        cancel_enrollment(data, payload, ch, method, properties)
 
 
 def refund_callback(ch, method, properties, body):
