@@ -368,7 +368,7 @@ class CreateData():
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'course': ['invalid parent course in schedule']}
+            inserted_item.errors = {'course': ['invalid parent course or section in schedule']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -454,7 +454,7 @@ class CreateData():
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in instructor']}
+            inserted_item.errors = {'parent': ['invalid parent course or section in instructor']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
