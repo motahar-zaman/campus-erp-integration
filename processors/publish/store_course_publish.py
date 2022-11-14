@@ -18,8 +18,13 @@ initialize_django()
 
 class StoreCoursePublish():
     def course_publish_in_stores(self, doc, data, course_provider, course_provider_model):
-        external_id = str(data['data'].get('external_id', data['match'].get('course', '')))
-        for store_slug in data['publishing_stores']:
+        if data['data'].get('external_id', None):
+            external_id = str(data['data']['external_id'])
+        else:
+            external_id = str(data['match'].get('course', ''))
+
+        publishing_stores = data.get('publishing_stores', [])
+        for store_slug in publishing_stores:
             # insert every item in mongo to get status individually
             mongo_data = {'data': data, 'publish_job_id': doc['id'], 'type': 'course_publishing_'+store_slug, 'time': timezone.now(),
                           'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id}
@@ -29,6 +34,7 @@ class StoreCoursePublish():
                 inserted_item = log_serializer.save()
             else:
                 print(log_serializer.errors)
+                return False
 
             try:
                 store = Store.objects.get(url_slug=store_slug)
