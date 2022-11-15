@@ -64,8 +64,18 @@ class CreateData():
                     inserted_item = log_serializer.save()
                 else:
                     print(log_serializer.errors)
+                    continue
 
                 data = item['data']
+                # check if required fields are available or not
+                status, msg = self.validate_fields(data, 'course')
+                if not status:
+                    inserted_item.errors = {'error': [msg]}
+                    inserted_item.status = 'failed'
+                    inserted_item.message = 'error occurred'
+                    inserted_item.save()
+                    continue
+
                 level = data.get('level', None)
                 if level not in ['beginner', 'intermediate', 'advanced']:
                     level = ''
@@ -139,7 +149,10 @@ class CreateData():
 
     def create_sections(self, doc, data, course_provider, course_provider_model, contracts=[]):
         # insert every item in mongo to get status individually
-        external_id = str(data['data'].get('external_id', data['parent'].get('course', '')))
+        if data['data'].get('external_id', None):
+            external_id = str(data['data']['external_id'])
+        else:
+            external_id = 'blank'
         mongo_data = {
             'data': data, 'publish_job_id': doc['id'], 'type': 'section_create', 'time': timezone.now(),
             'message': 'task is still in queue', 'status': 'pending', 'external_id': external_id
@@ -150,6 +163,16 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(data, 'section')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         # Access data from MongoDB
         try:
@@ -310,6 +333,7 @@ class CreateData():
                                 inserted_item = log_serializer.save()
                             else:
                                 print(log_serializer.errors)
+                                return False
 
                             # find the child products first
                             try:
@@ -363,12 +387,22 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(data, 'schedule')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         try:
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'course': ['invalid parent course in schedule']}
+            inserted_item.errors = {'course': ['invalid parent course or section in schedule']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -449,12 +483,22 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(data, 'instructor')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         try:
             course_model = CourseModel.objects.get(external_id=data['parent']['course'], sections__external_id=data['parent']['section'], provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
-            inserted_item.errors = {'parent': ['invalid parent in instructor']}
+            inserted_item.errors = {'parent': ['invalid parent course or section in instructor']}
             inserted_item.status = 'failed'
             inserted_item.message = 'error occurred'
             inserted_item.save()
@@ -514,6 +558,16 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(item, 'product')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         try:
             store = Store.objects.get(url_slug=item['data']['store_slug'])
@@ -577,6 +631,16 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(item, 'subject')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         data = item.get('data', [])
         data['slug'] = slugify(data['title'])
@@ -696,6 +760,16 @@ class CreateData():
             inserted_item = log_serializer.save()
         else:
             print(log_serializer.errors)
+            return False
+
+        # check if required fields are available or not
+        status, msg = self.validate_fields(item, 'question')
+        if not status:
+            inserted_item.errors = {'error': [msg]}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
         data = item['data']
         data['provider_type'] = 'course_provider'
@@ -740,3 +814,99 @@ class CreateData():
         inserted_item.save()
 
         return True
+
+
+    def validate_fields(self, data, data_type):
+        if data_type == 'course':
+            if not data.get('external_id', None):
+                return False, 'external_id is required'
+            elif not data.get('title', None):
+                return False, 'title is required'
+            elif not data.get('code', None):
+                return False, 'code is required'
+            elif not data.get('description', None):
+                return False, 'description is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'section':
+            if not data.get('parent', None):
+                return False, 'parent is required'
+            elif not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('code', None):
+                return False, 'code is required'
+            elif not data['data'].get('fee', None):
+                return False, 'fee is required'
+            elif not data['data'].get('execution_mode', None):
+                return False, 'execution_mode is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'schedule':
+            if not data.get('parent', None):
+                return False, 'parent is required'
+            elif not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('external_version_id', None):
+                return False, 'external_version_id is required'
+            elif not data['data'].get('description', None):
+                return False, 'description is required'
+            elif not data['data'].get('start_at', None):
+                return False, 'start_at is required'
+            elif not data['data'].get('end_at', None):
+                return False, 'end_at is required'
+            elif not data['data'].get('building_code', None):
+                return False, 'building_code is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'instructor':
+            if not data.get('parent', None):
+                return False, 'parent is required'
+            elif not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('name', None):
+                return False, 'name is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'product':
+            if not data['data'].get('store_slug', None):
+                return False, 'store_slug is required'
+            elif not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('product_type', None):
+                return False, 'product_type is required'
+            elif not data['data'].get('title', None):
+                return False, 'title is required'
+            elif not data['data'].get('tax_code', None):
+                return False, 'tax_code is required'
+            elif not data['data'].get('fee', None):
+                return False, 'fee is required'
+            elif not data['data'].get('minimum_fee', None):
+                return False, 'minimum_fee is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'subject':
+            if not data.get('parent', None):
+                return False, 'parent is required'
+            elif not data.get('publishing_stores', None):
+                return False, 'publishing_stores is required'
+            elif not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('name', None):
+                return False, 'name is required'
+            else:
+                return True, 'okay'
+
+        elif data_type == 'question':
+            if not data['data'].get('external_id', None):
+                return False, 'external_id is required'
+            elif not data['data'].get('title', None):
+                return False, 'title is required'
+            elif not data.get('input', None):
+                return False, 'input is required'
+            else:
+                return True, 'okay'
