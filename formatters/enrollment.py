@@ -90,6 +90,7 @@ class EnrollmentFormatter(object):
         }
 
     def enroll(self, payload):
+        print('data formation function')
         mindedge_data = []
         hir_data = {
             'enrollments': []
@@ -110,6 +111,7 @@ class EnrollmentFormatter(object):
                 payment = Payment.objects.get(id=payload['payment_id'])
 
             for profile_id, external_id, enrollment_id in zip(payload['profile_id'], payload['external_id'], payload['course_enrollment_id']):
+                print('inside forloop')
                 with scopes_disabled():
                     try:
                         profile = Profile.objects.get(id=profile_id)
@@ -119,10 +121,13 @@ class EnrollmentFormatter(object):
                     try:
                         course_enrollment = CourseEnrollment.objects.get(id=enrollment_id)
                     except CourseEnrollment.DoesNotExist:
+                        print('course_enrollment does not exists')
                         continue
                     else:
+                        print('course_enrollment status ' +course_enrollment.status)
                         course_enrollment.status = CourseEnrollment.STATUS_PENDING
                         course_enrollment.save()
+                        print('course_enrollment status after approval' + course_enrollment.status)
 
                 try:
                     enrollment_url = course_enrollment.course.course_provider.configuration['enrollment_url']
