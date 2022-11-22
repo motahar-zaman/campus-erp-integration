@@ -124,10 +124,12 @@ class EnrollmentFormatter(object):
                         print('course_enrollment does not exists')
                         continue
                     else:
+                        print('course_enrollment id '+ str(course_enrollment.ref_id))
+                        print('order ref ' + str(course_enrollment.cart_item.cart.order_ref))
                         print('course_enrollment status ' +course_enrollment.status)
                         course_enrollment.status = CourseEnrollment.STATUS_PENDING
                         course_enrollment.save()
-                        print('course_enrollment status after approval' + course_enrollment.status)
+                        print('course_enrollment status after approval ' + course_enrollment.status)
 
                 try:
                     enrollment_url = course_enrollment.course.course_provider.configuration['enrollment_url']
