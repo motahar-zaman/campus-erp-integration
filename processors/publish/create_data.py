@@ -292,7 +292,10 @@ class CreateData():
                             title=course.title,
                             tax_code='ST080031',
                             fee=section.fee,
-                            minimum_fee=section.fee
+                            minimum_fee=section.fee,
+                            total_quantity=section.seat_capacity,
+                            quantity_sold=0,
+                            available_quantity=section.available_seat,
                         )
 
                         store_course_section, created = StoreCourseSection.objects.get_or_create(
