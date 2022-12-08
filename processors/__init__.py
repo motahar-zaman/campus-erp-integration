@@ -39,10 +39,10 @@ def enroll_callback(ch, method, properties, body):
             data = formatter.enroll(payload)
             enroll(data, payload, ch, method, properties)
 
-    if 'crm_user' in method.routing_key:
-        formatter = CRMFormatter()
-        data = formatter.add_or_update_user(payload)
-        add_or_update_user(data)
+    # if 'crm_user' in method.routing_key:
+    #     formatter = CRMFormatter()
+    #     data = formatter.add_or_update_user(payload)
+    #     add_or_update_user(data)
 
     # if 'crm_product' in method.routing_key:
     #     formatter = CRMFormatter()
