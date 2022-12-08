@@ -44,10 +44,10 @@ def enroll_callback(ch, method, properties, body):
         data = formatter.add_or_update_user(payload)
         add_or_update_user(data)
 
-    if 'crm_product' in method.routing_key:
-        formatter = CRMFormatter()
-        data = formatter.add_or_update_product(payload)
-        add_or_update_product(data)
+    # if 'crm_product' in method.routing_key:
+    #     formatter = CRMFormatter()
+    #     data = formatter.add_or_update_product(payload)
+    #     add_or_update_product(data)
 
     if 'tax' in method.routing_key:
         formatter = TaxFormatter()
@@ -76,12 +76,12 @@ def refund_callback(ch, method, properties, body):
         unenroll(data)
         # print('Done')
 
-    if 'crm_product' in method.routing_key:
-        # print('* Updating product in crm')
-        formatter = CRMFormatter()
-        data = formatter.add_or_update_product(payload)
-        add_or_update_product(data)
-        # print('Done')
+    # if 'crm_product' in method.routing_key:
+    #     # print('* Updating product in crm')
+    #     formatter = CRMFormatter()
+    #     data = formatter.add_or_update_product(payload)
+    #     add_or_update_product(data)
+    #     # print('Done')
 
     if 'tax' in method.routing_key:
         # print('* Refunding tax')
