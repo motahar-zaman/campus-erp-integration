@@ -899,8 +899,10 @@ class CreateData():
                 return False, 'publishing_stores is required'
             elif not data['data'].get('external_id', None):
                 return False, 'external_id is required'
-            elif not data['data'].get('name', None):
-                return False, 'name is required'
+            elif not data['data'].get('title', None):
+                return False, 'title is required'
+            elif not data['data'].get('is_published', None):
+                return False, 'is_published is required'
             else:
                 return True, 'okay'
 
@@ -909,7 +911,7 @@ class CreateData():
                 return False, 'external_id is required'
             elif not data['data'].get('title', None):
                 return False, 'title is required'
-            elif not data.get('input', None):
+            elif not data['data'].get('input', None):
                 return False, 'input is required'
             else:
                 return True, 'okay'
