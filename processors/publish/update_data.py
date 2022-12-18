@@ -663,9 +663,10 @@ class UpdateData():
             return False
 
         else:
-            data['question_type'] = data['input'].get('type', question.question_type)
-            data['configuration'] = data['input'].get('config', question.configuration)
-            autocomplete = data['configuration'].get('autocomplete', False)
+            if data.get('input', None):
+                data['question_type'] = data['input'].get('type', question.question_type)
+                data['configuration'] = data['input'].get('config', question.configuration)
+                autocomplete = data['configuration'].get('autocomplete', False)
             question_bank_serializer = QuestionBankSerializer(question, data=data, partial=True)
 
         collection = 'question_bank_options'
