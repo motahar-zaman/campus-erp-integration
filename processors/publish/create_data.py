@@ -893,9 +893,7 @@ class CreateData():
                 return True, 'okay'
 
         elif data_type == 'subject':
-            if not data.get('parent', None):
-                return False, 'parent is required'
-            elif not data.get('publishing_stores', None):
+            if not data.get('publishing_stores', None):
                 return False, 'publishing_stores is required'
             elif not data['data'].get('external_id', None):
                 return False, 'external_id is required'
