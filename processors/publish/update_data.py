@@ -69,7 +69,15 @@ class UpdateData():
         data['provider'] = course_provider_model.id
 
         try:
-            course_model = CourseModel.objects.get(external_id=str(item['match']['course']), provider=course_provider_model)
+            external_id = str(item['match']['course'])
+        except Exception:
+            inserted_item.errors = {'match': ['course external_id not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
+            course_model = CourseModel.objects.get(external_id=external_id, provider=course_provider_model)
         except CourseModel.DoesNotExist:
             inserted_item.errors = {'course': ['course_model does not found in database']}
             inserted_item.status = 'failed'
@@ -158,7 +166,16 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
-            course_model = CourseModel.objects.get(external_id=str(data['match']['course']), provider=course_provider_model)
+            course_external_id = str(data['match']['course'])
+            section_external_id = str(data['match']['section'])
+        except Exception:
+            inserted_item.errors = {'match': ['external_ids not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
+            course_model = CourseModel.objects.get(external_id=course_external_id, provider=course_provider_model)
         except CourseModel.DoesNotExist:
             # without that we can not proceed comfortably
             inserted_item.errors = {'parent': ['corresponding course model does not found']}
@@ -172,7 +189,7 @@ class UpdateData():
         fee = 0.0
 
         for section in course_model.sections:
-            if section.external_id == str(data['match']['section']):
+            if section.external_id == section_external_id:
                 section_model_data = section
                 section_model_code = section_model_data['code']
                 break
@@ -212,7 +229,7 @@ class UpdateData():
 
         if course_model.sections:
             for section_idx, sec_data in enumerate(course_model.sections):
-                if sec_data['external_id'] == str(data['match']['section']):
+                if sec_data['external_id'] == section_external_id:
                     new_section_data = sec_data.to_mongo().to_dict()
                     new_section_data.update(section_model_serializer.data)
                     course_model.sections[section_idx] = SectionModel(**new_section_data)
@@ -342,9 +359,19 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
+            course_external_id = str(data['match']['course'])
+            section_external_id = str(data['match']['section'])
+            schedule_external_id = str(data['match']['schedule'])
+        except Exception:
+            inserted_item.errors = {'match': ['external_ids not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
             course_model = CourseModel.objects.get(
-                external_id=str(data['match']['course']),
-                sections__external_id=str(data['match']['section']),
+                external_id=course_external_id,
+                sections__external_id=section_external_id,
                 provider=course_provider_model
             )
         except CourseModel.DoesNotExist:
@@ -373,11 +400,11 @@ class UpdateData():
             return False
 
         for section_idx, section in enumerate(course_model.sections):
-            if section['external_id'] == str(data['match']['section']):
+            if section['external_id'] == section_external_id:
                 serializer = CheckSectionModelValidationSerializer(section)
                 if serializer.data['schedules']:
                     for schedule_idx, schedule in enumerate(serializer.data['schedules']):
-                        if schedule['external_id'] == str(data['match']['schedule']):
+                        if schedule['external_id'] == schedule_external_id:
                             serializer.data['schedules'][schedule_idx].update(schedule_serializer.data)
                             break
                     else:
@@ -416,8 +443,18 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
+            course_external_id = str(data['match']['course'])
+            section_external_id = str(data['match']['section'])
+            instructor_external_id = str(data['match']['instructor'])
+        except Exception:
+            inserted_item.errors = {'match': ['external_ids not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
             course_model = CourseModel.objects.get(
-                external_id=str(data['match']['course']), sections__external_id=str(data['match']['section']),
+                external_id=course_external_id, sections__external_id=section_external_id,
                 provider=course_provider_model
             )
         except CourseModel.DoesNotExist:
@@ -431,7 +468,7 @@ class UpdateData():
         data['data']['provider'] = course_provider_model.id
         try:
             instructor_model = InstructorModel.objects.get(
-                external_id=str(data['match']['instructor']), provider=course_provider_model
+                external_id=instructor_external_id, provider=course_provider_model
             )
         except InstructorModel.DoesNotExist:
             inserted_item.errors = {'instructor': ['instructor does not found']}
@@ -472,6 +509,15 @@ class UpdateData():
             print(log_serializer.errors)
 
         try:
+            product_external_id = str(item['match']['product'])
+            product_type=item['data']['product_type']
+        except Exception:
+            inserted_item.errors = {'match': ['external_id in match or product_type not found']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
             store = Store.objects.get(url_slug=item['data']['store_slug'])
         except Store.DoesNotExist:
             inserted_item.errors = {'store': ['corresponding store does not found in database']}
@@ -502,8 +548,8 @@ class UpdateData():
             with scopes_disabled():
                 try:
                     product = Product.objects.get(
-                        external_id= str(item['match']['product']), store=store,
-                        product_type=item['data']['product_type']
+                        external_id= product_external_id, store=store,
+                        product_type=product_type
                     )
                 except Product.DoesNotExist:
                     inserted_item.errors = {'product': ['corresponding product does not found']}
@@ -541,10 +587,17 @@ class UpdateData():
         else:
             print(log_serializer.errors)
 
-        data = item['data']
-        catalog_slug = slugify(item['match'].get('title', ''))
-        store_slug = item['match'].get('store', '')
+        try:
+            catalog_slug = slugify(item['match']['title'])
+            store_slug = item['match']['store']
+        except Exception:
+            inserted_item.errors = {'match': ['title or store not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
 
+        data = item['data']
         if data.get('title', False):
             data['slug'] = slugify(data['title'])
 
@@ -654,7 +707,15 @@ class UpdateData():
         data = item['data']
 
         try:
-            question = QuestionBank.objects.get(external_id=item['match'].get('question', ''), provider_ref=course_provider.id)
+            question_external_id = str(item['match']['question'])
+        except Exception:
+            inserted_item.errors = {'match': ['external_id not found in match']}
+            inserted_item.status = 'failed'
+            inserted_item.message = 'error occurred'
+            inserted_item.save()
+            return False
+        try:
+            question = QuestionBank.objects.get(external_id=question_external_id, provider_ref=course_provider.id)
         except QuestionBank.DoesNotExist:
             inserted_item.errors = {'question': ['question does not found']}
             inserted_item.status = 'failed'
