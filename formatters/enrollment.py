@@ -154,7 +154,7 @@ class EnrollmentFormatter(object):
                     j1_data['payment'] = {
                         "lines":[
                             {
-                                'payment_id': payment.transaction_request_id,
+                                'payment_id': str(payment.transaction_request_id),
                                 'bank': payment.bank,
                                 'amount': str(payment.amount),
                                 'status': payment.status,
@@ -197,7 +197,7 @@ class EnrollmentFormatter(object):
                     hir_data['payment'] = {
                         "lines":[
                             {
-                                'payment_id': payment.transaction_request_id,
+                                'payment_id': str(payment.transaction_request_id),
                                 'bank': payment.bank,
                                 'amount': str(payment.amount),
                                 'status': payment.status,

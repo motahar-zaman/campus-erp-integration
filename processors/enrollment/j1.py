@@ -192,7 +192,7 @@ def store_logging_data(request_body, request_headers, response_headers, response
                 }
             },
             'status_code': status_code,
-            'summary': 'request-response of enrollment to partner',
+            'summary': 'enrollment request-response',
             'ERP': course_enrollment.course.course_provider.configuration.get('erp', ''),
             'created_at': timezone.now()
         }
