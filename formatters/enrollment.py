@@ -141,6 +141,9 @@ class EnrollmentFormatter(object):
                     mindedge_config = course_enrollment.course.course_provider.configuration
 
                 elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
+                    payment_mode = 'offline' if 'note' in payment.affiliate_payment_info else 'online'
+                    transaction_reference = payment.transaction_reference if payment_mode == 'online' \
+                        else payment.affiliate_payment_info.get('reference', None)
                     j1_config = course_enrollment.course.course_provider.configuration
                     j1_data['order_id'] = str(payment.cart.order_ref)
                     j1_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
@@ -165,9 +168,9 @@ class EnrollmentFormatter(object):
                                 'account_number': payment.account_number,
                                 'transaction_time': str(payment.transaction_time),
                                 'reason_description': payment.reason_description,
-                                'transaction_reference': payment.transaction_reference,
+                                'transaction_reference': transaction_reference,
                                 "note": payment.affiliate_payment_info.get('note', None),
-                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
+                                "mode": payment_mode
                             }
                         ]
                     }
@@ -181,6 +184,9 @@ class EnrollmentFormatter(object):
                     j1_data['agreement_details'] = agreement_details
 
                 elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'hir':
+                    payment_mode = 'offline' if 'note' in payment.affiliate_payment_info else 'online'
+                    transaction_reference = payment.transaction_reference if payment_mode == 'online' \
+                        else payment.affiliate_payment_info.get('reference', None)
                     hir_config = course_enrollment.course.course_provider.configuration
                     hir_data['order_id'] = str(payment.cart.order_ref)
                     hir_data['enrollments'].append(self.j1(profile, external_id, course_enrollment, payment))
@@ -205,9 +211,9 @@ class EnrollmentFormatter(object):
                                 'account_number': payment.account_number,
                                 'transaction_time': str(payment.transaction_time),
                                 'reason_description': payment.reason_description,
-                                'transaction_reference': payment.transaction_reference,
+                                'transaction_reference': transaction_reference,
                                 "note": payment.affiliate_payment_info.get('note', None),
-                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
+                                "mode": payment_mode
                             }
                         ]
                     }
