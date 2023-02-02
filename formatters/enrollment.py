@@ -167,7 +167,7 @@ class EnrollmentFormatter(object):
                                 'reason_description': payment.reason_description,
                                 'transaction_reference': payment.transaction_reference,
                                 "note": payment.affiliate_payment_info.get('note', None),
-                                "mode": 'online' if payment.affiliate_payment_info.get('note', None) else 'offline'
+                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
                             }
                         ]
                     }
@@ -207,7 +207,7 @@ class EnrollmentFormatter(object):
                                 'reason_description': payment.reason_description,
                                 'transaction_reference': payment.transaction_reference,
                                 "note": payment.affiliate_payment_info.get('note', None),
-                                "mode": 'online' if payment.affiliate_payment_info.get('note', None) else 'offline'
+                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
                             }
                         ]
                     }
