@@ -149,20 +149,27 @@ class EnrollmentFormatter(object):
                         'name': course_enrollment.store.name
                     }
                     j1_data['payment'] = {
-                        'amount': str(payment.amount),
-                        'currency_code': payment.currency_code,
-                        'transaction_reference': payment.transaction_reference,
-                        'auth_code': payment.auth_code,
-                        'payment_type': payment.payment_type,
-                        'bank': payment.bank,
-                        'account_number': payment.account_number,
-                        'card_type': payment.card_type,
-                        'card_number': payment.card_number,
-                        'reason_code': payment.reason_code,
-                        'reason_description': payment.reason_description,
-                        'customer_ip': payment.customer_ip,
-                        'status': payment.status,
-                        'transaction_time': str(payment.transaction_time),
+                        "lines":[
+                            {
+                                'payment_id': payment.transaction_request_id,
+                                'bank': payment.bank,
+                                'amount': str(payment.amount),
+                                'status': payment.status,
+                                'auth_code': payment.auth_code,
+                                'card_type': payment.card_type,
+                                'card_number': payment.card_number,
+                                'customer_ip': payment.customer_ip,
+                                'reason_code': payment.reason_code,
+                                'payment_type': payment.payment_type,
+                                'currency_code': payment.currency_code,
+                                'account_number': payment.account_number,
+                                'transaction_time': str(payment.transaction_time),
+                                'reason_description': payment.reason_description,
+                                'transaction_reference': payment.transaction_reference,
+                                "note": payment.affiliate_payment_info.get('note', None),
+                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
+                            }
+                        ]
                     }
                     agreement_details = {}
                     for key, val in payment.cart.agreement_details.items():
@@ -182,20 +189,27 @@ class EnrollmentFormatter(object):
                         'name': course_enrollment.store.name
                     }
                     hir_data['payment'] = {
-                        'amount': str(payment.amount),
-                        'currency_code': payment.currency_code,
-                        'transaction_reference': payment.transaction_reference,
-                        'auth_code': payment.auth_code,
-                        'payment_type': payment.payment_type,
-                        'bank': payment.bank,
-                        'account_number': payment.account_number,
-                        'card_type': payment.card_type,
-                        'card_number': payment.card_number,
-                        'reason_code': payment.reason_code,
-                        'reason_description': payment.reason_description,
-                        'customer_ip': payment.customer_ip,
-                        'status': payment.status,
-                        'transaction_time': str(payment.transaction_time),
+                        "lines":[
+                            {
+                                'payment_id': payment.transaction_request_id,
+                                'bank': payment.bank,
+                                'amount': str(payment.amount),
+                                'status': payment.status,
+                                'auth_code': payment.auth_code,
+                                'card_type': payment.card_type,
+                                'card_number': payment.card_number,
+                                'customer_ip': payment.customer_ip,
+                                'reason_code': payment.reason_code,
+                                'payment_type': payment.payment_type,
+                                'currency_code': payment.currency_code,
+                                'account_number': payment.account_number,
+                                'transaction_time': str(payment.transaction_time),
+                                'reason_description': payment.reason_description,
+                                'transaction_reference': payment.transaction_reference,
+                                "note": payment.affiliate_payment_info.get('note', None),
+                                "mode": 'online' if 'note' in payment.affiliate_payment_info else 'offline'
+                            }
+                        ]
                     }
                     agreement_details = {}
                     for key, val in payment.cart.agreement_details.items():

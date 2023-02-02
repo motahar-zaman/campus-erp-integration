@@ -35,6 +35,8 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
             response.raise_for_status()
             resp_headers = response.headers
             resp_status_code = response.status_code
+
+            print(resp_headers, resp_status_code)
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -58,6 +60,10 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
+            print(resp_headers, resp_status_code)
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -110,6 +116,10 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
+            print(resp_headers, resp_status_code)
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -133,6 +143,10 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
+            print(resp_headers, resp_status_code)
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -162,6 +176,7 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
 
 
 def store_logging_data(request_body, request_headers, response_headers, response_body, status_code=200):
+    print('in store_logging_data method')
     try:
         enrollment_id = request_body['data']['enrollments']['enrollment_id']
         course_enrollment = CourseEnrollment.objects.get(ref_id=enrollment_id)
@@ -185,7 +200,10 @@ def store_logging_data(request_body, request_headers, response_headers, response
             'ERP': course_enrollment.course.course_provider.configuration.get('erp', ''),
             'created_at': timezone.now()
         }
-
+        print('log_data build successfully')
+        print(log_data)
         save_to_mongo(data=log_data, collection='erp_request_response')
-    except:
+    except Exception as err:
+        print('exception in store_logging_data method')
+        print(err)
         pass
