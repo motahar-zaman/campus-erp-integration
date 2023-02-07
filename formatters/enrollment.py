@@ -141,7 +141,10 @@ class EnrollmentFormatter(object):
                     mindedge_config = course_enrollment.course.course_provider.configuration
 
                 elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'j1':
-                    payment_mode = 'offline' if 'note' in payment.affiliate_payment_info else 'online'
+                    if payment.affiliate_payment_info and 'note' in payment.affiliate_payment_info:
+                        payment_mode = 'offline'
+                    else:
+                        payment_mode = 'online'
                     transaction_reference = payment.transaction_reference if payment_mode == 'online' \
                         else payment.affiliate_payment_info.get('reference', None)
                     j1_config = course_enrollment.course.course_provider.configuration
@@ -184,7 +187,10 @@ class EnrollmentFormatter(object):
                     j1_data['agreement_details'] = agreement_details
 
                 elif course_enrollment.course.course_provider.configuration.get('erp', '') == 'hir':
-                    payment_mode = 'offline' if 'note' in payment.affiliate_payment_info else 'online'
+                    if payment.affiliate_payment_info and 'note' in payment.affiliate_payment_info:
+                        payment_mode = 'offline'
+                    else:
+                        payment_mode = 'online'
                     transaction_reference = payment.transaction_reference if payment_mode == 'online' \
                         else payment.affiliate_payment_info.get('reference', None)
                     hir_config = course_enrollment.course.course_provider.configuration
