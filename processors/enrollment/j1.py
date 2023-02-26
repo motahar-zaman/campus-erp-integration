@@ -6,6 +6,7 @@ from decouple import config
 import time
 from django.utils import timezone
 import pika
+from shared_models.models import CourseEnrollment
 
 
 def handle_enrollment(data, configuration, payload, ch, method, properties):
@@ -16,6 +17,8 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
 
     exchange_dead_letter = 'dlx'
     routing_key = 'enrollment.enroll'
+    resp_headers = {}
+    resp_status_code = 200
 
     if configuration.get('auth_type', '') == 'basic':
         try:
@@ -30,6 +33,9 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -41,6 +47,7 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
 
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
+            store_logging_data(data, headers, resp_headers, str(err), status_code=503)
             return {'message': str(err)}
 
     else:
@@ -52,6 +59,9 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -62,6 +72,7 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
 
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
+            store_logging_data(data, headers, resp_headers, str(err), status_code=503)
             return {'message': str(err)}
         else:
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
@@ -72,7 +83,9 @@ def handle_enrollment(data, configuration, payload, ch, method, properties):
     except ValueError:
         resp = {'message': 'invalid response received'}
         save_to_mongo(data={'erp': 'j1:response', 'data': {'message': 'invalid response received'}}, collection='erp_response')
+        store_logging_data(data, headers, resp_headers, resp, resp_status_code)
         return resp
+    store_logging_data(data, headers, resp_headers, resp, resp_status_code)
     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': resp}}, collection='erp_response')
     return resp
 
@@ -85,6 +98,8 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
 
     exchange_dead_letter = 'dlx'
     routing_key = 'enrollment.cancel'
+    resp_headers = {}
+    resp_status_code = 200
 
     if configuration.get('auth_type', '') == 'basic':
         try:
@@ -99,6 +114,9 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -110,6 +128,7 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
 
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
+            store_logging_data(data, headers, resp_headers, str(err), status_code=503)
             return {'message': str(err)}
 
     else:
@@ -121,6 +140,9 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
                 data=json.dumps(data)
             )
             response.raise_for_status()
+            resp_headers = response.headers
+            resp_status_code = response.status_code
+
         except requests.exceptions.RequestException as err:
             payload['retry_count'] += 1
             if payload['retry_count'] <= int(config('TASK_MAX_RETRY_COUNT')):
@@ -131,6 +153,7 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
 
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             save_to_mongo(data={'erp': 'j1:response', 'data': {'message': str(err)}}, collection='erp_response')
+            store_logging_data(data, headers, resp_headers, str(err), status_code=503)
             return {'message': str(err)}
         else:
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
@@ -141,6 +164,39 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
     except ValueError:
         resp = {'message': 'invalid response received'}
         save_to_mongo(data={'erp': 'j1:response', 'data': {'message': 'invalid response received'}}, collection='erp_response')
+        store_logging_data(data, headers, resp_headers, resp, resp_status_code)
         return resp
+    store_logging_data(data, headers, resp_headers, resp, resp_status_code)
     save_to_mongo(data={'erp': 'j1:response', 'data': {'message': resp}}, collection='erp_response')
     return resp
+
+
+def store_logging_data(request_body, request_headers, response_headers, response_body, status_code=200):
+    try:
+        # to get course_provider info
+        enrollment_id = request_body['enrollments'][0]['enrollment_id']
+        course_enrollment = CourseEnrollment.objects.get(ref_id=enrollment_id)
+        log_data = {
+            'course_provider': {
+                'id': str(course_enrollment.course.course_provider.id),
+                'name': course_enrollment.course.course_provider.name,
+            },
+            'data': {
+                'request': {
+                    'headers': request_headers,
+                    'body': request_body
+                },
+                'response': {
+                    'headers': response_headers,
+                    'body': response_body
+                }
+            },
+            'status_code': status_code,
+            'summary': 'enrollment request-response',
+            'ERP': course_enrollment.course.course_provider.configuration.get('erp', ''),
+            'created_at': timezone.now()
+        }
+        save_to_mongo(data=log_data, collection='erp_request_response')
+    except Exception as err:
+        print(err)
+        pass
