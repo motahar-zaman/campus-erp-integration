@@ -7,6 +7,8 @@ import time
 from django.utils import timezone
 import pika
 from shared_models.models import CourseEnrollment
+from datetime import datetime
+import pytz
 
 
 def handle_enrollment(data, configuration, payload, ch, method, properties):
@@ -172,6 +174,7 @@ def handle_enrollment_cancellation(data, configuration, payload, ch, method, pro
 
 
 def store_logging_data(request_body, request_headers, response_headers, response_body, status_code=200):
+    UTC = pytz.utc
     try:
         # to get course_provider info
         enrollment_id = request_body['enrollments'][0]['enrollment_id']
@@ -194,7 +197,7 @@ def store_logging_data(request_body, request_headers, response_headers, response
             'status_code': status_code,
             'summary': 'enrollment request-response',
             'ERP': course_enrollment.course.course_provider.configuration.get('erp', ''),
-            'created_at': timezone.now()
+            'created_at': datetime.now(UTC)
         }
         save_to_mongo(data=log_data, collection='erp_request_response')
     except Exception as err:
