@@ -35,7 +35,7 @@ from datetime import datetime
 import decimal
 from django.utils import timezone
 from django.utils.text import slugify
-
+from decimal import Decimal
 from django_scopes import scopes_disabled
 from models.publish.publish_job import PublishJob as PublishJobModel
 from mongoengine import NotUniqueError
@@ -299,7 +299,7 @@ class UpdateData():
                             title=course.title,
                             tax_code='ST080031',
                             fee=section.fee,
-                            minimum_fee=section.fee
+                            minimum_fee=Decimal(0.00)
                         )
 
                         store_course_section, created = StoreCourseSection.objects.get_or_create(
@@ -317,7 +317,7 @@ class UpdateData():
                         product.title = course.title
                         product.tax_code = 'ST080031'
                         product.fee = section.fee
-                        product.minimum_fee = section.fee
+                        product.minimum_fee = Decimal(0.00)
                         product.save()
 
                     # delete previous related products for this product if available
@@ -541,7 +541,7 @@ class UpdateData():
                 'available_quantity': data.get('available_quantity', None),
                 'tax_code': data.get('tax_code', ''),
                 'fee': data.get('fee', 0),
-                'minimum_fee': data.get('minimum_fee', 0),
+                'minimum_fee': data.get('minimum_fee', Decimal(0.00)),
                 'currency_code': data.get('currency_code', 'usd')
             }
 

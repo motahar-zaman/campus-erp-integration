@@ -9,7 +9,7 @@ from models.log.publish_log import PublishLog as PublishLogModel
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 import requests
-
+from decimal import Decimal
 from django_scopes import scopes_disabled
 from django.db import transaction
 from django_initializer import initialize_django
@@ -133,7 +133,7 @@ class StoreCoursePublish():
                                     available_quantity=section.available_seat,
                                     tax_code=config('AVATAX_TAX_CODE', 'ST080031'),
                                     fee=section.fee,
-                                    minimum_fee=section.fee,
+                                    minimum_fee=Decimal(0.00),
                                     currency_code='usd'
                                 )
 
@@ -173,7 +173,7 @@ class StoreCoursePublish():
                             else:
                                 product = store_course_section.product
                                 product.fee = section.fee
-                                product.minimum_fee = section.fee
+                                product.minimum_fee = Decimal(0.00)
                                 product.active_status = True
                                 product.save()
 
