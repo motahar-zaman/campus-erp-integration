@@ -32,7 +32,7 @@ from models.course.course import Course as CourseModel
 from models.course.section import Section as SectionModel
 from models.log.publish_log import PublishLog as PublishLogModel
 from datetime import datetime
-import decimal
+from decimal import Decimal
 import os
 from django.utils import timezone
 import mongoengine
@@ -292,7 +292,7 @@ class CreateData():
                             title=course.title,
                             tax_code='ST080031',
                             fee=section.fee,
-                            minimum_fee=section.fee,
+                            minimum_fee=Decimal(0.00),
                             total_quantity=section.seat_capacity,
                             quantity_sold=0,
                             available_quantity=section.available_seat,
@@ -313,7 +313,7 @@ class CreateData():
                         product.title = course.title
                         product.tax_code = 'ST080031'
                         product.fee = section.fee
-                        product.minimum_fee = section.fee
+                        product.minimum_fee = Decimal(0.00)
                         product.save()
 
                     # delete previous related products for this product if available
@@ -596,7 +596,7 @@ class CreateData():
                 'available_quantity': data.get('available_quantity', None),
                 'tax_code': data.get('tax_code', ''),
                 'fee': data.get('fee', 0),
-                'minimum_fee': data.get('minimum_fee', 0),
+                'minimum_fee': data.get('minimum_fee', Decimal(0.00)),
                 'currency_code': data.get('currency_code', 'usd')
             }
 
